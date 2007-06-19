@@ -18,50 +18,101 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import logging
+import time
+import socket
+import SocketServer
+import select
+from types import TupleType, ListType, StringType
+import copy
+
+import Pyro.core
+
 from chimera.core.location import Location
+from chimera.core.threads import getThreadPool
 
-class Register(object):
+class RegisterEntry (Pyro.core.ObjBase):
 
-    def __init__(self, kind = None):
+    def __init__ (self):
+
+        Pyro.core.ObjBase.__init__ (self)
+
+        self._location = None
+        self._instance = None
+        self._uri      = None
+        self._created  = time.time ()
+
+    location = property (lambda self: self._location, lambda self, value: setattr (self, '_location', value))
+    instance = property (lambda self: self._instance, lambda self, value: setattr (self, '_instance', value))
+    uri      = property (lambda self: self._uri,      lambda self, value: setattr (self, '_uri', value))
+    created  = property (lambda self: self._created)
+
+    def __str__ (self):
+        return "<%s %s at %s>" % (self.location, self.instance, self.uri)
+
+
+class Register (Pyro.core.ObjBase):
+
+    def __init__(self):
+
+        Pyro.core.ObjBase.__init__ (self)
 
         self.objects = {}
-        self.kind = kind or "object"
 
-    def register(self, location, instance):
+        # the underlying Pyro daemon used to register instances
+        Pyro.core.initServer (banner=False)
+        self.daemon = Pyro.core.Daemon ()
 
-        if location in self.objects:
+    def _getDaemon (self):
+        return self.daemon
+
+    def register(self, item, instance):
+
+        location = self._validLocation (item)
+
+        if not location:
             return False
 
-        self.objects[location] = instance
-        return True
-
-    def unregister(self, location):
-        if not location in self.objects:
+        if location in self:
             return False
 
-        del self.objects[location]
+        entry = RegisterEntry ()
+        entry.location = location
+        entry.instance = instance
+
+        # connect instance to the daemon
+        entry.uri = self.daemon.connect (instance)
+
+        self.objects[location] = entry
+
         return True
 
-    def update(self, location, instance):
-        return self.unregister(location) and self.register(location, instance)
+    def unregister(self, item):
 
-    def __repr__(self):
-        _str = "There are %d %s(s) avaiable.\n" % (len(self.objects), self.kind)
-        _str += self.objects.__repr__()
-        
-        return _str
+        location = self._validLocation (item)
+
+        if not location:
+            return False
+
+        if not location in self:
+            return False
+
+        ret = self.get(location)
+
+        del self.objects[ret.location]
+
+        return True
 
     def __contains__(self, item):
 
-        if not isinstance (item, Location):
-            item = Location (item)
+        location = self._validLocation (item)
 
-        if not item.isValid():
-            return None
+        if not location:
+            return False
 
-        _ret = filter(lambda x: x == item, self.objects.keys())
+        ret = filter(lambda x: x == location, self.keys())
 
-        if _ret:
+        if ret:
             return True
         else:
             return False
@@ -80,82 +131,161 @@ class Register(object):
 
     def values(self):
         return self.objects.values()
-    
+
     def __getitem__(self, item):
 
-        r = self.get(item)
+        ret = self.get(item)
 
-        if not r:
+        if not ret:
             raise KeyError
         else:
-            return r
+            return ret
 
-    def get(self, item):
+    def get (self, item):
 
-        if not isinstance (item, Location):
-            item = Location (item)
+        location = self._validLocation (item)
 
-        if not item.isValid():
-            return None
+        if not location:
+            return False
 
         try:
-            number = int(item._name)
-            return self.getByIndex(item._class, number)
+            index = int(location.name)
+            return self._getByIndex(location, index)
         except ValueError:
             # not a numbered instance
             pass
 
-        if self.__contains__(item):
-            ret = filter(lambda x: x == item, self.objects.keys())
-            return self.objects[ret[0]]
-        else:
-            return None
+        return self._get (location)
 
     def getByClass(self, cls):
-
-        _insts = filter(lambda inst: inst._class == cls, self.objects.keys())
-
-        return _insts
-
-    def getByIndex(self, cls, index):
         
-        insts = self.getByClass(cls)
+        entries = filter(lambda location: location.cls == cls, self.keys())
+
+        ret = []
+        for entry in entries:
+            ret.append (self.get (entry))
+
+        ret.sort (key=lambda entry: entry.created)
+
+        return ret
+
+ 
+    def _get (self, item):
+
+        location = self._validLocation (item)
+
+        if not location:
+            return False
+
+        if location in self:
+            ret = filter(lambda x: x == location, self.keys())
+            return self.objects[ret[0]]
+        else:
+            return False
+
+
+    def _getByIndex(self, item, index):
+
+        location = self._validLocation (item)
+
+        if not location:
+            return False
+
+        insts = self.getByClass(location.cls)
 
         if insts:
             try:
-                return self.objects[insts.pop(index)]
+                return self.objects[insts[index].location]
             except IndexError:
                 return False
         else:
             return False
 
-    def getLocation(self, instance):
-        
-        if not instance in self.objects.values():
-            return None
+    def _validLocation (self, item):
+       
+        ret = item
 
-        for location, inst in self.objects.items():
-            if inst == instance:
-                return location
+        if not isinstance (item, Location):
+            ret = Location (item)
 
-if __name__ == '__main__':
+        if not ret.isValid():
+            ret = False
 
-    from chimera.core.location import Location
-    a = object()
-    l = Location("/Telescope/meade?opt1=val1,opt2=val2")
+        return ret
 
-    b = object()
-    ll = Location("/Telescope/paramount?opt1=val1,opt2=val2")
+REGISTER_COMMAND_LOCATION = "chimera_register_location"
+REGISTER_COMMAND_SHUTDOWN = "chimera_register_shutdown"
+
+REGISTER_DEFAULT_HOST = '<broadcast>'
+REGISTER_DEFAULT_PORT = 9876
+
+class RegisterBroadcastServer(SocketServer.ThreadingUDPServer):
+
+    def __init__(self, addr, requestHandler, reuse = False):
+
+        self.register_uri = ''
+
+        (location, port) = addr
+
+        try:
+            SocketServer.ThreadingUDPServer.allow_reuse_address = reuse
+            SocketServer.ThreadingUDPServer.__init__(self, (location,port), requestHandler)
+        except socket.error:
+            raise
+
+    def setRegisterURI (self, uri):
+        self.register_uri = uri
+
+    def getRegisterURI (self):
+        return self.register_uri
 
 
-    reg = Register()
-    reg.register(l, a)
-    reg.register(ll, b)
+class RegisterRequestHandler(SocketServer.DatagramRequestHandler):
+    def handle (self):
+        cmd = self.request[0]
 
-    print reg
-    print reg[l]
-    print reg["/Telescope/meade"]
+        if cmd == REGISTER_COMMAND_LOCATION:
+            self.request[1].sendto(self.server.getRegisterURI(), 0, self.client_address)
+            return
 
-    lll = reg.getByClass("Telescope")
-    for i in lll:
-        print reg[i]
+        if cmd == REGISTER_COMMAND_SHUTDOWN:
+            self.server.shutdown = 1
+            return
+
+def RegisterLocator (addr = (REGISTER_DEFAULT_HOST, REGISTER_DEFAULT_PORT), timeout = 1):
+
+    sk = socket.socket (socket.AF_INET, socket.SOCK_DGRAM)
+
+    if '<broadcast>' in addr[0]:
+        sk.setsockopt (socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+    sk.sendto (REGISTER_COMMAND_LOCATION, 0, (addr))
+
+    ins, out, errs = select.select ([sk], [], [sk], timeout)
+
+    if not ins:
+        return False
+
+    for s in ins:
+        reply, recvfrom = s.recvfrom (1000)
+        return reply
+
+    return False
+
+def RegisterFactory (addr = (REGISTER_DEFAULT_HOST, REGISTER_DEFAULT_PORT)):
+
+    server = RegisterBroadcastServer (addr, RegisterRequestHandler, reuse=True)
+
+    register = Register ()
+
+    daemon = register.getDaemon ()
+    daemon.connect (register)
+
+    getThreadPool().queueTask (register.getDaemon().requestLoop)
+
+    server.setRegisterURI (str(register.getProxy().URI))
+
+    getThreadPool().queueTask (server.serve_forever)
+
+    return register
+

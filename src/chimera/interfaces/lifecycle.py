@@ -20,7 +20,6 @@
 
 from chimera.core.interface import Interface
 
-
 class ILifeCycle (Interface):
 
     """
@@ -29,10 +28,11 @@ class ILifeCycle (Interface):
 
     """
 
-    __options__ = {"config": "some-magic-default-config.xml"}
+    __options__ = {"config": "some-magic-default-config.xml",
+                   "loop_frequency": 10}
     
 
-    def __init__(self, manager):
+    def __init__(self):
         """
         Do object initialization.
 
@@ -42,26 +42,20 @@ class ILifeCycle (Interface):
 
         @note: Runs on the Manager's thread.
         @warning: This method must not block, so be a good boy/girl.
-        
-        @param manager: a L{Manager} instance
-        @type manager: L{Manager}
         """
         
-    def init(self, config):
+    def __start__ (self):
         """
         Do device initialization. Open files, access drivers and
         sockets. This method it's called by Manager, just after the constructor.
-
-        @param config: configuration dictionary.
-        @type config: dict
 
         @note: Runs on the L{Manager} thread.
         @warning: This method must not block, so be a good boy/girl.
         """
         
-    def shutdown(self):
+    def __stop__ (self):
         """
-        Cleanup {init} actions.
+        Cleanup {__start__} actions.
 
         {shutdown} it's called by Manager when Manager is diying or
         programatically at any time (to remove an Instrument during
@@ -71,10 +65,10 @@ class ILifeCycle (Interface):
         @warning: This method must not block, so be a good boy/girl.
         """
 
-    def main(self):
+    def __main__ (self):
         """
         Main control method. Implementeers could use this method to
-        implement control loop functions. See L{Instrument}.
+        implement control loop functions. See L{BasicLifeCycle}.
 
         @note: This method runs on their own thread.
         """

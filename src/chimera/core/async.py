@@ -27,7 +27,7 @@ from chimera.core.threads import getThreadPool
 # FIXME: exception handling
 
 def lock(func):
-        func.lock = threading.Lock()
+        #func.lock = threading.Lock()
         return func
 
 

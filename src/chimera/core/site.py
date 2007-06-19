@@ -21,8 +21,11 @@
 import sys
 import os.path
 import logging
-from optparse import OptionParser
+import optparse
 from xml.parsers.expat import ExpatError, ErrorString
+
+import Pyro.core
+import Pyro.naming
 
 import chimera.util.etree.ElementTree as ET
 from chimera.core.location import Location
@@ -195,29 +198,51 @@ class Site(object):
                             format='%(asctime)s %(levelname)s %(module)s:%(lineno)d %(message)s',
                             datefmt='%d-%m-%Y %H:%M:%S (%j)')
 
-        if self.options.verbose:
+        if self.options.verbose == 1:
+            logging.getLogger().setLevel(logging.INFO)
+
+        if self.options.verbose > 1:
             logging.getLogger().setLevel(logging.DEBUG)
 
         self.manager = None
 
-        logging.debug("Starting system.")
+        logging.info("Starting system.")
 
     def parseArgs(self, args):
 
-        parser = OptionParser(prog="chimera", version=_chimera_version_,
-                              description=_chimera_description_)
+        def check_location (option, opt_str, value, parser):
+            l = Location (value)
+            
+            if not value or not l.isValid ():
+                raise optparse.OptionValueError ("%s requires a valid location (%s passed)." % (opt_str, value))
 
-        parser.add_option("-i", "--instrument", action="append", dest="instruments",
+            eval ('parser.values.%s.append ("%s")' % (option.dest, value))
+
+        def check_includepath (option, opt_str, value, parser):
+
+            if not value or not os.path.isdir (os.path.abspath(value)):
+                raise optparse.OptionValueError ("%s requires a valid directory (%s doesn't exists)." % (opt_str, os.path.abspath(value)))
+
+            eval ('parser.values.%s.append ("%s")' % (option.dest, value))
+
+        parser = optparse.OptionParser(prog="chimera", version=_chimera_version_,
+                                       description=_chimera_description_,
+                                       usage="chimera --help for more information")
+
+        parser.add_option("-i", "--instrument", action="callback", callback=check_location,
+                          dest="instruments", type="string",
                           help="Load the instrument defined by LOCATION."
                                "This option could be setted many times to load multiple instruments.",
                           metavar="LOCATION")
 
-        parser.add_option("-c", "--controller", action="append", dest="controllers",
+        parser.add_option("-c", "--controller", action="callback", callback=check_location,
+                          dest="controllers", type="string",
                           help="Load the controller defined by LOCATION."
                                "This option could be setted many times to load multiple controllers.",
                           metavar="LOCATION")
 
-        parser.add_option("-d", "--driver", action="append", dest="drivers",
+        parser.add_option("-d", "--driver", action="callback", callback=check_location,
+                          dest="drivers", type="string",
                           help="Load the driver defined by LOCATION."
                                "This option could be setted many times to load multiple drivers.",
                           metavar="LOCATION")
@@ -227,29 +252,32 @@ class Site(object):
                                "This option could be setted many times to load inst/controllers from multiple files.",
                           metavar="FILE")
 
-        parser.add_option("-I", "--instruments-dir", action="append", dest="inst_dir",
+        parser.add_option("-I", "--instruments-dir", action="callback", callback=check_includepath,
+                          dest="inst_dir", type="string",
                           help="Append PATH to instruments load path.",
                           metavar="PATH")
 
-        parser.add_option("-C", "--controllers-dir", action="append", dest="ctrl_dir",
+        parser.add_option("-C", "--controllers-dir", action="callback", callback=check_includepath,
+                          dest="ctrl_dir", type="string",
                           help="Append PATH to controllers load path.",
                           metavar="PATH")
 
-        parser.add_option("-D", "--drivers-dir", action="append", dest="drv_dir",
+        parser.add_option("-D", "--drivers-dir", action="callback", callback=check_includepath,
+                          dest="drv_dir", type="string",
                           help="Append PATH to drivers load path.",
                           metavar="PATH")
 
-        parser.add_option("-v", "--verbose", action="store_true", dest='verbose',
-                          help="Increase screen log level.")
+        parser.add_option("-v", "--verbose", action="count", dest='verbose',
+                          help="Increase log level (multiple v's to increase even more).")
 
         parser.set_defaults(instruments = [],
-                        controllers = [],
-                        drivers     = [],
-                        config = [],
-                        inst_dir = [],
-                        ctrl_dir = [],
-                        drv_dir = [],
-                        verbose=False)
+                            controllers = [],
+                            drivers     = [],
+                            config = [],
+                            inst_dir = [],
+                            ctrl_dir = [],
+                            drv_dir = [],
+                            verbose = 0)
 
         return parser.parse_args(args)
 
@@ -278,29 +306,24 @@ class Site(object):
         # init from config
 
         for drv in self.config.getDrivers():
-            l = Location(drv)
-            self.manager.initDriver(l)
+            self.manager.initDriver(drv)
 
         for inst in self.config.getInstruments():
-            l = Location(inst)
-            self.manager.initInstrument(l)
+            self.manager.initInstrument(inst)
 
         for ctrl in self.config.getControllers():
-            l = Location(ctrl)
-            self.manager.initController(l)
-            
+            self.manager.initController(ctrl)
+
         # init from cmd line
         for drv in self.options.drivers:
-            l = Location(drv)
-            self.manager.initDriver(l)
+            self.manager.initDriver(drv)
 
         for inst in self.options.instruments:
-            l = Location(inst)
-            self.manager.initInstrument(l)
-
+            self.manager.initInstrument(inst)
+            
         for ctrl in self.options.controllers:
-            l = Location(ctrl)
-            self.manager.initController(l)
+            self.manager.initController(ctrl)
+
 
     def shutdown(self):
         self.manager.shutdown()

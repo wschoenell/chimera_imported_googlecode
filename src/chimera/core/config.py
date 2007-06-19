@@ -261,8 +261,8 @@ class RangeChecker (Checker):
 
 class Config (object):
 
-    def __init__ (self, options):
-        object.__setattr__ (self, '_options', self._readOptions (options))
+    def __init__ (self, obj):
+        object.__setattr__ (self, '_options', self._readOptions (obj.__config__))
 
     def _readOptions (self, opt):
 
@@ -365,22 +365,22 @@ class Config (object):
 
         return self
 
-    def __getattr__ (self, name):
+#     def __getattr__ (self, name):
 
-        if name in self:
-            return self[name]
+#         if name in self:
+#             return self[name]
 
-        else:
-            logging.debug ("invalid option ('%s')." % name)
-            raise AttributeError
+#         else:
+#             logging.debug ("invalid option ('%s')." % name)
+#             raise AttributeError
 
-    def __setattr__ (self, name, value):
+#     def __setattr__ (self, name, value):
 
-        if name in self:
-            self[name] = value
-        else:
-            logging.debug ("invalid option ('%s')." % name)
-            raise AttributeError
+#         if name in self:
+#             self[name] = value
+#         else:
+#             logging.debug ("invalid option ('%s')." % name)
+#             raise AttributeError
 
     
 if __name__ == '__main__':

@@ -21,72 +21,80 @@
 import time
 import threading
 
+import Pyro.core
+
 from chimera.interfaces.lifecycle import ILifeCycle
 from chimera.core.event import EventsProxy
 from chimera.core.config import Config
 
-class BasicLifeCycle(ILifeCycle):
 
-    def __init__(self, manager):
+class BasicLifeCycle (ILifeCycle, Pyro.core.ObjBase):
 
-        self.manager = manager
+    def __init__(self):
 
-        # loop control
-        self.timeslice = 0.5
-        self.looping = False
-
-        # term event
-        self.term = threading.Event()
+        Pyro.core.ObjBase.__init__ (self)
 
         # event handling
-        self.__eventsProxy__ = EventsProxy(self.__events__)
+        self.__events_proxy__ = EventsProxy (self)
 
-        # create configuration as necessary
-        self.config = Config(self.__options__)
+        # configuration handling
+        self.__config_proxy__ = Config (self)
 
-    def init(self, config):
+    # config
+    def __getitem__ (self, item):
+        return self.__config_proxy__.__getitem__ (item)
+    
+    def __setitem__ (self, item, value):
+        return self.__config_proxy__.__setitem__ (item, value)
+
+    # event
+    def publish (self, event, *args, **kwargs):
+
+        if event in self.__events_proxy__:
+            self.__events_proxy__[event] (*args, **kwargs)
+
+    def subscribe (self, event, clbk):
+
+        if event in self.__events_proxy__:
+            self.__events_proxy__[event].__iadd__ (clbk)
+            return True
+
+        return False
+    
+    def unsubscribe (self, event, clbk):
+
+        if event in self.__events_proxy__:
+            self.__events_proxy__[event].__isub__ (clbk)
+            return True
+
+        return False
+    
+    # lifecycle
+    def __start__ (self):
         pass
 
-    def shutdown(self):
+    def __stop__ (self):
         pass
 
-    def main(self):
+    def __control__ (self):
+        pass
+
+    def __main__ (self):
             
-        # FIXME: better main loop control
-        
-        # enter main loop
-        self._main()
-        
-        return True
-
-    def control(self):
-        pass
-
-    def _main(self):
-
-        self.looping = True
-
         try:
 
-            while(self.looping):
+            while True:
 
-                if (self.term.isSet()):
-                    self.looping = False
-                    return
-            
                 # run control function
-                self.control()
+                self.__control__()
 
                 time.sleep(self.timeslice)
 
         except KeyboardInterrupt, e:
-            self.looping = False
             return
 
-    def __getattr__(self, attr):
-        if attr in self.__eventsProxy__:
-            return self.__eventsProxy__[attr]
-        else:
-            raise AttributeError
-        
-        
+#     def __getattr__(self, attr):
+#         if attr in self.__eventsProxy__:
+#             return self.__eventsProxy__[attr]
+#         else:
+#             raise AttributeError

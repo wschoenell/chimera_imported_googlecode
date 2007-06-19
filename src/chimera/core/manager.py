@@ -24,44 +24,52 @@ import traceback
 import logging
 from types import StringType
 
-from chimera.core.register import Register
+from chimera.core.register import RegisterLocator, RegisterFactory
 from chimera.core.proxy import Proxy
 from chimera.core.location import Location
 from chimera.core.threads import getThreadPool
 
-class Manager(object):
+import Pyro.core
 
-    def __init__(self, pool = None, add_system_path = True):
-        logging.debug("Starting manager.")
+# manager singleton
+# FIXME: better implementation needed
+
+__manager_instance = None
+
+def Manager (*args, **kwargs):
+
+    global __manager_instance
+    
+    if __manager_instance is None:
+        __manager_instance = _Manager (*args, **kwargs)
+
+    return __manager_instance
+
+
+class _Manager (object):
+
+    def __init__(self, add_system_path = True):
+        logging.info("Starting manager.")
 
         self._includePath = {"instrument": [],
                              "controller": [],
                              "driver"    : []}
 
-        self._instruments = Register("instrument")
-        self._controllers = Register("controller")
-        self._drivers     = Register("driver")
-
-        self._pool = pool or getThreadPool ()
-
-        self._cache = { }
-
         if add_system_path:
             self._addSystemPath ()
 
+        self._cache = { }
+
+        register_uri = RegisterLocator ()
+
+        if register_uri:
+            Pyro.core.initClient (banner=0)
+            self.register = Pyro.core.getProxyForURI (register_uri)
+        else:
+            self.register = RegisterFactory ()
+
     def shutdown(self):
-
-        for location in self._controllers.keys():
-            self.shutdownController(location)
-            self.removeController(location)
-
-        for location in self._instruments.keys():
-            self.shutdownInstrument(location)
-            self.removeInstrument(location)
-
-        for location in self._drivers.keys():
-            self.shutdownDriver(location)
-            self.removeDriver(location)
+        pass
 
     def _addSystemPath (self):
         
@@ -80,9 +88,6 @@ class Manager(object):
         logging.debug("Adding %s to %s include path." % (path, kind))
 
         self._includePath[kind].append(path)
-
-    def setPool(self, pool):
-        self._pool = pool
 
     def _getClass(self, name, kind):
         """
@@ -150,171 +155,178 @@ class Manager(object):
             return False
 
     
-    def _get(self, location, register, proxy = True):
+    def get(self, location, proxy = True):
 
         if type(location) == StringType:
             location = Location(location)
 
-        obj = register.get(location)
+        entry = self.register.get(location)
 
-        if not obj:
+        if not entry:
             # not found on register, try to add
-            if not self._init (location, register):
-                obj = None
+            if not self.init (location):
+                entry = None
             else:
-                obj = register.get(location)
+                entry = self.register.get(location)
 
-        if obj != None:
+        if entry != None:
             if proxy:
-                return Proxy(obj, self._pool)
+                return Pyro.core.getProxyForURI (entry.uri)
             else:
-                return obj
+                return entry.instance
         else:
             return None
 
-    def _add(self, location, register):
+    def add(self, location):
+
+        if type(location) == StringType:
+            location = Location(location)
 
         # get the class
-        cls = self._getClass(location._class, register.kind)
+        cls = self._getClass(location._class, location.namespace)
 
         if not cls:
             return False
 
-        # run object constructor
+        # run object __init__
         # it runs on the same thread, so be a good boy
         # and don't block manager's thread
         try:
-            obj = cls(self)
-            return register.register(location, obj)
+            obj = cls()
+            return self.register.register(location, obj)
                         
         except Exception:
-            logging.exception("Error in %s %s constructor. Exception follows..." %
-                              (register.kind, location))
+            logging.exception("Error in %s __init__. Exception follows..." % location)
             return False
     
-    def _remove(self, location, register):
-        return register.unregister(location)
+    def remove(self, location):
 
-    def _init(self, location, register):
+        if type(location) == StringType:
+            location = Location(location)
+        
+        return self.register.unregister(location)
 
-        if(not self._pool):
-            logging.debug("There is no thread pool avaiable.")
-            logging.debug("You should create one and set with setPool.")
-            return False
+    def init(self, location):
 
-        if location not in register:
-            if not self._add(location, register):
+        if type(location) == StringType:
+            location = Location(location)
+        
+        if location not in self.register:
+            if not self.add(location):
                 return False
 
-        logging.debug("Initializing %s %s." % (register.kind, location))
+        logging.debug("Starting %s." % location)
 
         # run object init
         # it runs on the same thread, so be a good boy and don't block manager's thread
-        try:
-            ret = register[location].init(location.options)
+        entry = self.register[location]
+
+        try:        
+            ret = entry.instance.__start__()
+
             if not ret:
-                logging.warning ("%s init returned an error. Removing %s from register." % (location, location))
+                logging.warning ("%s __start__ returned an error. Removing %s from register." % (location, location))
                 return False
         except Exception:
-            logging.exception("Error running %s %s init method. Exception follows..." %
-                              (register.kind, location))
+            logging.exception("Error running %s __start__ method. Exception follows..." % location)
             return False
 
         try:
             # FIXME: thread exception handling
             # ok, now schedule object main in a new thread
-            self._pool.queueTask(register[location].main)
+            getThreadPool().queueTask(entry.instance.__main__)
         except Exception:
-            logging.exception("Error running %s %s main method. Exception follows..." %
-                              (register.kind, location))
+            logging.exception("Error running %s %s __main__ method. Exception follows..." % location)
             return False
 
         return True
 
-    def _shutdown(self, location, register):
+    def shutdown(self, location):
 
-        if location not in register:
+        if type(location) == StringType:
+            location = Location(location)
+
+        if location not in self.register:
             return False
 
         try:
-            logging.debug("Shutting down %s %s." % (register, location))
+            logging.debug("Stopping %s." % location)
 
-            # run object shutdown method
+            # run object __stop__ method
             # again: runs on the same thread, so don't block it
-            register[location].shutdown()
-            self._remove(location, register)
+            self.register[location].instance.__stop__()
+            self.remove(location)
             return True
 
         except Exception:
-            logging.exception("Error running %s %s shutdown method. Exception follows..." %
-                              (register.kind, location))
+            logging.exception("Error running %s __stop__ method. Exception follows..." % location)
             return False
 
     # helpers
 
-    def getLocation(self, obj):
-        # FIXME: buggy by definition
-        kinds = [self._controllers, self._instruments, self._drivers]
+#     def getLocation(self, obj):
+#         # FIXME: buggy by definition
+#         kinds = [self._controllers, self._instruments, self._drivers]
 
-        def _get (kind):
-            return kind.getLocation (obj)
+#         def _get (kind):
+#             return kind.getLocation (obj)
 
-        ret = map(_get, kinds)
+#         ret = map(_get, kinds)
 
-        for item in ret:
-            if item != None:
-                return item
+#         for item in ret:
+#             if item != None:
+#                 return item
 
-        return None
+#         return None
             
 
     # instruments
 
     def getInstrument(self, location, proxy = True):
-        return self._get(location, self._instruments, proxy)
+        return self.get('/instrument/'+location, proxy)
     
     def addInstrument(self, location):
-        return self._add(location, self._instruments)
+        return self.add('/instrument/'+location)
 
     def removeInstrument(self, location):
-        return self._remove(location, self._instruments)
+        return self.remove('/instrument/'+location)
 
     def initInstrument(self, location):
-        return self._init(location, self._instruments)
+        return self.init('/instrument/'+location)
 
     def shutdownInstrument(self, location):
-        return self._shutdown(location, self._instruments)
+        return self.shutdown('/instrument/'+location)
 
     # controllers
     
     def getController(self, location, proxy = True):
-        return self._get(location, self._controllers, proxy)
+        return self.get('/controller/'+location, proxy)
 
     def addController(self, location):
-        return self._add(location, self._controllers)
+        return self.add('/controller/'+location)
 
     def removeController(self, location):
-        return self._remove(location, self._controllers)
+        return self.remove('/controller/'+location)
 
     def initController(self, location):
-        return self._init(location, self._controllers)
+        return self.init('/controller/'+location)
 
     def shutdownController(self, location):
-        return self._shutdown(location, self._controllers)
+        return self.shutdown('/controller/'+location)
 
     # drivers
 
     def getDriver(self, location, proxy = True):
-        return self._get(location, self._drivers, proxy)
+        return self.get('/driver/'+location, proxy)
 
     def addDriver(self, location):
-        return self._add(location, self._drivers)
+        return self.add('/driver/'+location)
 
     def removeDriver(self, location):
-        return self._remove(location, self._drivers)
+        return self.remove('/driver/'+location)
 
     def initDriver(self, location):
-        return self._init(location, self._drivers)
+        return self.init('/driver/'+location)
 
     def shutdownDriver(self, location):
-        return self._shutdown(location, self._drivers)
+        return self.shutdown('/driver/'+location)

@@ -18,6 +18,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import copy_reg
+import types
 
 def event(f):
     f.event = True
@@ -29,12 +31,19 @@ def event(f):
 # TODO: argument checking
 # TODO: define delegate signature
 
+
+def _instance_method_pickler (method):
+    return (list, ([method.im_self.getProxy (), method.__name__],), None)
+
+copy_reg.pickle (types.MethodType, _instance_method_pickler)
+
+
 class EventsProxy:
 
-    def __init__(self, evs):
+    def __init__(self, obj):
         self._slots = {}
 
-        for ev in evs:
+        for ev in obj.__events__:
             self._slots[ev] = _EventSlot(ev)
         
     def __getitem__(self, name):
@@ -63,7 +72,12 @@ class _EventSlot:
         return self.__str__()
 
     def __call__(self, *a, **kw):
-        for f in self.targets: f(*a, **kw)
+        for f in self.targets:
+            if callable (f):
+                f(*a, **kw)
+            else:
+                proxy, method = f
+                proxy.__getattr__ (method)(*a, **kw)
     
     def __iadd__(self, f):
         self.targets.append(f)

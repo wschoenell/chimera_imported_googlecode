@@ -43,18 +43,18 @@ class InterfaceMeta(type):
         
         # look for configurations
 
-        _options = {}
+        _config = {}
         
         for name, obj in dictionary.iteritems():
-            if name == "__options__":
-                _options.update(obj)
+            if name == "__config__":
+                _config.update(obj)
 
         # search for configs in class bases
         for base in bases:
-            if hasattr(base, '__options__'):
-                _options.update(base.__options__)
+            if hasattr(base, '__config__'):
+                _config.update(base.__config__)
 
-        dictionary['__options__'] = _options
+        dictionary['__config__'] = _config
         
         return super(InterfaceMeta, metacls).__new__(metacls, clsname, bases, dictionary)
 

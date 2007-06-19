@@ -28,36 +28,41 @@ class Location(object):
 
     def __init__(self, location):
 
-        self._re =  re.compile('/+(?P<class>[\w]*)/+(?P<name>[\w]*)\??(?P<options>[\w\S\s=,]*)')
+        self._re =  re.compile('(?P<namespace>/+[\w]*)?/+(?P<class>[\w]*)/+(?P<name>[\w]*)\??(?P<options>[\w\S\s=,]*)')
 
+        self._namespace = "instrument"
         self._class = "class"
         self._name = "name"
+
         self._options = {}
 
         self._valid = True
 
         try:
             if type(location) == DictType:
+                self._namespace    =  location["namespace"]
                 self._class         = location["class"]
                 self._name          = location["name"]
                 self._options       = location["options"]
                 
             elif type(location) in [ListType, TupleType]:
+                self._namespace     = location[0]
                 self._class         = location[1]
                 self._name          = location[2]
                 self._options       = location[3]
 
             elif type(location) == StringType:
 
-                (self._class, self._name, self._options) = matches = self.parse(location)
+                (self._namespace, self._class, self._name, self._options) = matches = self.parse(location)
 
         except (KeyError, IndexError), e:
             self._valid = False
 
-    cls     = property(lambda self: self._class)
-    name    = property(lambda self: self._name)
-    options = property(lambda self: self._options)
-                
+    namespace = property(lambda self: self._namespace)
+    cls       = property(lambda self: self._class)
+    name      = property(lambda self: self._name)
+    options   = property(lambda self: self._options)
+
     def isValid(self):
 
         return self._valid
@@ -68,7 +73,11 @@ class Location(object):
 
         if matches:
 
-            cls, name, tmpOpts = matches.groups()
+            namespace, cls, name, tmpOpts = matches.groups()
+
+            if namespace:
+                while namespace.startswith ('/'):
+                    namespace = namespace[1:]
 
             opts = {}
 
@@ -79,22 +88,31 @@ class Location(object):
 
         else :
             self._valid = False
+
+            namespace = "instrument"
             cls  = "class"
             name = "name"
             opts = {}
 
             logging.debug("Invalid location %s." % location)
 
-        return (cls, name, opts)
+        return (namespace, cls, name, opts)
 
     def __eq__(self, loc):
+
+        if not isinstance (loc, Location):
+            loc = Location (loc)
+
+            if not loc.isValid ():
+                return False
 
         return (loc._class == self._class) and \
                (loc._name == self._name)
     
     def __repr__(self):
-        _str = "/%s/%s" % (self._class,
-                           self._name)
+        _str = "/%s/%s/%s" % (self._namespace,
+                              self._class,
+                              self._name)
 
         return _str
 
@@ -103,7 +121,8 @@ class Location(object):
 
 if __name__ == '__main__':
 
-    l = Location('/Sample/s?device=/dev/ttyS0,model=25.txt')
+    l = Location('/instrument/Sample/s?device=/dev/ttyS0,model=25.txt')
+    print l.namespace
     print l.cls
     print l.name
     print l.options
