@@ -31,16 +31,10 @@ def event(f):
 # TODO: argument checking
 # TODO: define delegate signature
 
-
-def _instance_method_pickler (method):
-    return (list, ([method.im_self.getProxy (), method.__name__],), None)
-
-copy_reg.pickle (types.MethodType, _instance_method_pickler)
-
-
 class EventsProxy:
 
     def __init__(self, obj):
+        
         self._slots = {}
 
         for ev in obj.__events__:

@@ -18,3 +18,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import copy_reg
+import types
+
+def _instance_method_pickler (method):
+    return (list, ([method.im_self.getProxy (), method.__name__],), None)
+
+copy_reg.pickle (types.MethodType, _instance_method_pickler)
+

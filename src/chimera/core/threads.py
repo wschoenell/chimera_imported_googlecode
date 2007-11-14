@@ -185,7 +185,7 @@ class ThreadPoolThread(threading.Thread):
                     cmd.lock.acquire()
                     logging.debug("Locking %s" % cmd)
 
-                logging.debug("Running %s on thread %s" % (cmd, self.getName()))
+                logging.debug("Running %s on thread %s" % (str(cmd), self.getName()))
                 if callback is None:
                     cmd(*args, **kwargs)
                 else:

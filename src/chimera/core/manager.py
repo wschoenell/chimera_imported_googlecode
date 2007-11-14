@@ -22,9 +22,9 @@ import sys
 import os.path
 import traceback
 import logging
-from types import StringType
+from types import StringType, TupleType
 
-from chimera.core.register import RegisterLocator, RegisterFactory
+from chimera.core.register import RegisterLocator, RegisterFactory, RegisterURI, REGISTER_DEFAULT_HOST, REGISTER_DEFAULT_PORT
 from chimera.core.proxy import Proxy
 from chimera.core.location import Location
 from chimera.core.threads import getThreadPool
@@ -48,28 +48,82 @@ def Manager (*args, **kwargs):
 
 class _Manager (object):
 
-    def __init__(self, add_system_path = True):
+    includePath = {}
+    registers = []
+    _objects = {}
+    cache = { }
+    daemon = None
+
+    def __init__(self, addr = None, add_system_path = True):
+
         logging.info("Starting manager.")
 
-        self._includePath = {"instrument": [],
+        self.includePath = {"instrument": [],
                              "controller": [],
                              "driver"    : []}
 
         if add_system_path:
             self._addSystemPath ()
 
-        self._cache = { }
+        # get our registry
+        if not addr:
+            addr = (REGISTER_DEFAULT_HOST, REGISTER_DEFAULT_PORT)
 
-        register_uri = RegisterLocator ()
+        self._addr = addr
 
-        if register_uri:
-            Pyro.core.initClient (banner=0)
-            self.register = Pyro.core.getProxyForURI (register_uri)
-        else:
-            self.register = RegisterFactory ()
+        register = RegisterFactory (self._getDaemon(), self._addr)
+        
+        if register == False:
+            raise SystemError ("Couldn't start manager without a valid register.")
+
+        self._addRegister (register)
 
     def shutdown(self):
         pass
+
+    def _getDaemon (self):
+
+        if not self.daemon:
+            Pyro.core.initServer (banner=0)
+            self.daemon = Pyro.core.Daemon ()
+            getThreadPool().queueTask (self.daemon.requestLoop)            
+
+        return self.daemon
+    
+    def _addRegister (self, register):
+        # FIXME: resolve names?
+
+        # check if any other register serve this host/port pair
+        ret = filter (lambda reg: reg._serveFor (register.getAddress()), self.registers)
+        if ret:
+            logging.debug ("There is other register for %s:%d already. You cannot have two registers for the same host/port pair." % register.getAddress())
+            return False
+
+        self.registers.append(register)
+    
+        return True
+
+    def _getRegister (self, addr=None):
+
+        # UGLY HACK
+        if not addr:
+            addr = self._addr
+
+        ret = filter (lambda reg: reg._serveFor (addr), self.registers)
+
+        if ret:
+            return ret[0]
+
+        # looks for register using RegisterLocator
+        reg = RegisterLocator (addr, timeout = 10)
+
+        if not reg:
+            logging.warning ("Couldn't found a register at %s:%d." % addr)
+            return False
+
+        self._addRegister (reg)
+
+        return reg
 
     def _addSystemPath (self):
         
@@ -87,7 +141,7 @@ class _Manager (object):
             
         logging.debug("Adding %s to %s include path." % (path, kind))
 
-        self._includePath[kind].append(path)
+        self.includePath[kind].append(path)
 
     def _getClass(self, name, kind):
         """
@@ -98,15 +152,15 @@ class _Manager (object):
 
         # TODO: - add a reload method
 
-        if name in self._cache:
-            return self._cache[name]
+        if name in self.cache:
+            return self.cache[name]
 
         try:
             logging.debug("Looking for module %s." % name.lower())
 
             # adjust sys.path accordingly to kind
             tmpSysPath = sys.path
-            sys.path = self._includePath[kind] + sys.path
+            sys.path = self.includePath[kind] + sys.path
 
             module = __import__(name.lower(), globals(), locals(), [name])
 
@@ -118,12 +172,12 @@ class _Manager (object):
                               (name, name.lower(), module.__file__))
                 return False
 
-            self._cache[name] = vars(module)[name]
+            self.cache[name] = vars(module)[name]
 
             logging.debug("Module %s found (%s)" % (name.lower(),
                                                     module.__file__))
 
-            return self._cache[name]
+            return self.cache[name]
 
         except Exception, e:
 
@@ -155,25 +209,33 @@ class _Manager (object):
             return False
 
     
-    def get(self, location, proxy = True):
+    def get(self, location, addr, proxy = True):
 
         if type(location) == StringType:
             location = Location(location)
 
-        entry = self.register.get(location)
+        if not addr:
+            addr = (REGISTER_DEFAULT_HOST, REGISTER_DEFAULT_PORT)
+
+        register = self._getRegister(addr)
+
+        if not register:
+            return None
+
+        entry = register.get(location)
 
         if not entry:
             # not found on register, try to add
             if not self.init (location):
                 entry = None
             else:
-                entry = self.register.get(location)
+                entry = register.get(location)
 
         if entry != None:
             if proxy:
                 return Pyro.core.getProxyForURI (entry.uri)
             else:
-                return entry.instance
+                return self._objects[entry.location]
         else:
             return None
 
@@ -193,8 +255,14 @@ class _Manager (object):
         # and don't block manager's thread
         try:
             obj = cls()
-            return self.register.register(location, obj)
-                        
+
+            # connect to the daemon
+            uri = self._getDaemon().connect (obj)
+            self._getRegister().register(location, uri)
+
+            self._objects[location] = obj
+            
+            return True
         except Exception:
             logging.exception("Error in %s __init__. Exception follows..." % location)
             return False
@@ -204,25 +272,30 @@ class _Manager (object):
         if type(location) == StringType:
             location = Location(location)
         
-        return self.register.unregister(location)
+        return self._getRegister().unregister(location)
 
-    def init(self, location):
+    def start(self, location):
 
         if type(location) == StringType:
             location = Location(location)
+
+        logging.debug ("Trying to start module %s." % location)
         
-        if location not in self.register:
+        if location not in self._getRegister():
+            logging.debug ("Module %s was not found... will try to add it..." % location)
+            
             if not self.add(location):
+                logging.debug ("Couldn't add module %s... giving up..." % location)
                 return False
 
         logging.debug("Starting %s." % location)
 
         # run object init
         # it runs on the same thread, so be a good boy and don't block manager's thread
-        entry = self.register[location]
+        entry = self._getRegister()[location]
 
         try:        
-            ret = entry.instance.__start__()
+            ret = self._objects[location].__start__()
 
             if not ret:
                 logging.warning ("%s __start__ returned an error. Removing %s from register." % (location, location))
@@ -234,19 +307,19 @@ class _Manager (object):
         try:
             # FIXME: thread exception handling
             # ok, now schedule object main in a new thread
-            getThreadPool().queueTask(entry.instance.__main__)
+            getThreadPool().queueTask(self._objects[location].__main__)
         except Exception:
-            logging.exception("Error running %s %s __main__ method. Exception follows..." % location)
+            logging.exception("Error running %s __main__ method. Exception follows..." % location)
             return False
 
         return True
 
-    def shutdown(self, location):
+    def stop(self, location):
 
         if type(location) == StringType:
             location = Location(location)
 
-        if location not in self.register:
+        if location not in self._getRegister():
             return False
 
         try:
@@ -254,7 +327,7 @@ class _Manager (object):
 
             # run object __stop__ method
             # again: runs on the same thread, so don't block it
-            self.register[location].instance.__stop__()
+            self._objects[location].__stop__()
             self.remove(location)
             return True
 
@@ -282,8 +355,8 @@ class _Manager (object):
 
     # instruments
 
-    def getInstrument(self, location, proxy = True):
-        return self.get('/instrument/'+location, proxy)
+    def getInstrument(self, location, addr = None, proxy = True):
+        return self.get('/instrument/'+location, addr, proxy)
     
     def addInstrument(self, location):
         return self.add('/instrument/'+location)
@@ -291,16 +364,16 @@ class _Manager (object):
     def removeInstrument(self, location):
         return self.remove('/instrument/'+location)
 
-    def initInstrument(self, location):
-        return self.init('/instrument/'+location)
+    def startInstrument(self, location):
+        return self.start('/instrument/'+location)
 
-    def shutdownInstrument(self, location):
-        return self.shutdown('/instrument/'+location)
+    def stopInstrument(self, location):
+        return self.stop('/instrument/'+location)
 
     # controllers
     
-    def getController(self, location, proxy = True):
-        return self.get('/controller/'+location, proxy)
+    def getController(self, location, host = None, proxy = True):
+        return self.get('/controller/'+location, host, proxy)
 
     def addController(self, location):
         return self.add('/controller/'+location)
@@ -308,16 +381,16 @@ class _Manager (object):
     def removeController(self, location):
         return self.remove('/controller/'+location)
 
-    def initController(self, location):
-        return self.init('/controller/'+location)
+    def startController(self, location):
+        return self.start('/controller/'+location)
 
-    def shutdownController(self, location):
-        return self.shutdown('/controller/'+location)
+    def stopController(self, location):
+        return self.stop('/controller/'+location)
 
     # drivers
 
-    def getDriver(self, location, proxy = True):
-        return self.get('/driver/'+location, proxy)
+    def getDriver(self, location, host = None, proxy = True):
+        return self.get('/driver/'+location, host, proxy)
 
     def addDriver(self, location):
         return self.add('/driver/'+location)
@@ -325,8 +398,8 @@ class _Manager (object):
     def removeDriver(self, location):
         return self.remove('/driver/'+location)
 
-    def initDriver(self, location):
-        return self.init('/driver/'+location)
+    def startDriver(self, location):
+        return self.start('/driver/'+location)
 
-    def shutdownDriver(self, location):
-        return self.shutdown('/driver/'+location)
+    def stopDriver(self, location):
+        return self.stop('/driver/'+location)

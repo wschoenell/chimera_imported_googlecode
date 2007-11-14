@@ -31,42 +31,38 @@ import Pyro.core
 from chimera.core.location import Location
 from chimera.core.threads import getThreadPool
 
-class RegisterEntry (Pyro.core.ObjBase):
+class RegisterEntry (object):
 
     def __init__ (self):
 
-        Pyro.core.ObjBase.__init__ (self)
-
         self._location = None
-        self._instance = None
-        self._uri      = None
         self._created  = time.time ()
+        self._uri      = None        
 
     location = property (lambda self: self._location, lambda self, value: setattr (self, '_location', value))
-    instance = property (lambda self: self._instance, lambda self, value: setattr (self, '_instance', value))
-    uri      = property (lambda self: self._uri,      lambda self, value: setattr (self, '_uri', value))
     created  = property (lambda self: self._created)
-
+    uri      = property (lambda self: self._uri,      lambda self, value: setattr (self, '_uri', value))
+    
     def __str__ (self):
-        return "<%s %s at %s>" % (self.location, self.instance, self.uri)
+        return "<%s at %s>" % (self.location, self.uri)
 
 
 class Register (Pyro.core.ObjBase):
 
-    def __init__(self):
+    def __init__(self, addr):
 
-        Pyro.core.ObjBase.__init__ (self)
+        Pyro.core.ObjBase.__init__ (self)        
 
+        self.address = addr
         self.objects = {}
 
-        # the underlying Pyro daemon used to register instances
-        Pyro.core.initServer (banner=False)
-        self.daemon = Pyro.core.Daemon ()
+    def getAddress (self):
+        return self.address
 
-    def _getDaemon (self):
-        return self.daemon
+    def _serveFor (self, addr):
+        return self.getAddress() == addr
 
-    def register(self, item, instance):
+    def register(self, item, uri):
 
         location = self._validLocation (item)
 
@@ -78,10 +74,7 @@ class Register (Pyro.core.ObjBase):
 
         entry = RegisterEntry ()
         entry.location = location
-        entry.instance = instance
-
-        # connect instance to the daemon
-        entry.uri = self.daemon.connect (instance)
+        entry.uri = uri
 
         self.objects[location] = entry
 
@@ -213,13 +206,33 @@ class Register (Pyro.core.ObjBase):
 
         return ret
 
-REGISTER_COMMAND_LOCATION = "chimera_register_location"
-REGISTER_COMMAND_SHUTDOWN = "chimera_register_shutdown"
+REGISTER_COMMAND_LOCATION = "0x01"
+REGISTER_COMMAND_SHUTDOWN = "0x02"
 
-REGISTER_DEFAULT_HOST = '<broadcast>'
+REGISTER_DEFAULT_HOST = 'localhost'
 REGISTER_DEFAULT_PORT = 9876
 
-class RegisterBroadcastServer(SocketServer.ThreadingUDPServer):
+class RegisterURI (object):
+    host = REGISTER_DEFAULT_HOST
+    port = REGISTER_DEFAULT_PORT
+
+    def __init__ (self, addr):
+        self.host = addr[0]
+        self.port = addr[1]
+
+    def __cmp__ (self, other):
+        return self.host == other.host and self.port == other.port
+
+    def __getitem__ (self, index):
+        if index == 0:
+            return self.host
+
+        if index == 1:
+            return self.port
+    
+        raise IndexError ("Index out of bounds")
+
+class RegisterServer(SocketServer.ThreadingUDPServer):
 
     def __init__(self, addr, requestHandler, reuse = False):
 
@@ -227,11 +240,8 @@ class RegisterBroadcastServer(SocketServer.ThreadingUDPServer):
 
         (location, port) = addr
 
-        try:
-            SocketServer.ThreadingUDPServer.allow_reuse_address = reuse
-            SocketServer.ThreadingUDPServer.__init__(self, (location,port), requestHandler)
-        except socket.error:
-            raise
+        SocketServer.ThreadingUDPServer.allow_reuse_address = reuse
+        SocketServer.ThreadingUDPServer.__init__(self, (location,port), requestHandler)
 
     def setRegisterURI (self, uri):
         self.register_uri = uri
@@ -245,9 +255,9 @@ class RegisterRequestHandler(SocketServer.DatagramRequestHandler):
         cmd = self.request[0]
 
         if cmd == REGISTER_COMMAND_LOCATION:
-            self.request[1].sendto(self.server.getRegisterURI(), 0, self.client_address)
+            self.request[1].sendto(str(self.server.getRegisterURI()), 0, self.client_address)
             return
-
+ 
         if cmd == REGISTER_COMMAND_SHUTDOWN:
             self.server.shutdown = 1
             return
@@ -259,7 +269,7 @@ def RegisterLocator (addr = (REGISTER_DEFAULT_HOST, REGISTER_DEFAULT_PORT), time
     if '<broadcast>' in addr[0]:
         sk.setsockopt (socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
-    sk.sendto (REGISTER_COMMAND_LOCATION, 0, (addr))
+    sk.sendto (REGISTER_COMMAND_LOCATION, 0, addr)
 
     ins, out, errs = select.select ([sk], [], [sk], timeout)
 
@@ -268,22 +278,31 @@ def RegisterLocator (addr = (REGISTER_DEFAULT_HOST, REGISTER_DEFAULT_PORT), time
 
     for s in ins:
         reply, recvfrom = s.recvfrom (1000)
-        return reply
+
+        proxy = Pyro.core.getProxyForURI (reply)
+
+        if not proxy:
+            return False
+
+        return proxy
 
     return False
 
-def RegisterFactory (addr = (REGISTER_DEFAULT_HOST, REGISTER_DEFAULT_PORT)):
 
-    server = RegisterBroadcastServer (addr, RegisterRequestHandler, reuse=True)
+def RegisterFactory (daemon, addr = (REGISTER_DEFAULT_HOST, REGISTER_DEFAULT_PORT)):
 
-    register = Register ()
+    try:
+        server = RegisterServer (addr, RegisterRequestHandler)
+    except socket.error, e:
+        if e[0] == 98: # socket already in use
+            logging.warning ("Couldn't start register server. Address already in use (%s:%d)." % addr)
+        return False
 
-    daemon = register.getDaemon ()
-    daemon.connect (register)
+    register = Register (addr)
 
-    getThreadPool().queueTask (register.getDaemon().requestLoop)
+    uri = daemon.connect (register)
 
-    server.setRegisterURI (str(register.getProxy().URI))
+    server.setRegisterURI (uri)
 
     getThreadPool().queueTask (server.serve_forever)
 

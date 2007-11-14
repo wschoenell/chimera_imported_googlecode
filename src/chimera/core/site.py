@@ -284,7 +284,7 @@ class Site(object):
     def init(self):
 
         # manager
-        self.manager = Manager()
+        self.manager = Manager(addr=("150.162.110.2", 9876))
 
         # config file
         self.config = SiteConfiguration()
@@ -306,23 +306,23 @@ class Site(object):
         # init from config
 
         for drv in self.config.getDrivers():
-            self.manager.initDriver(drv)
+            self.manager.startDriver(drv)
 
         for inst in self.config.getInstruments():
-            self.manager.initInstrument(inst)
+            self.manager.startInstrument(inst)
 
         for ctrl in self.config.getControllers():
-            self.manager.initController(ctrl)
+            self.manager.startController(ctrl)
 
         # init from cmd line
         for drv in self.options.drivers:
-            self.manager.initDriver(drv)
+            self.manager.startDriver(drv)
 
         for inst in self.options.instruments:
-            self.manager.initInstrument(inst)
+            self.manager.startInstrument(inst)
             
         for ctrl in self.options.controllers:
-            self.manager.initController(ctrl)
+            self.manager.startController(ctrl)
 
 
     def shutdown(self):
