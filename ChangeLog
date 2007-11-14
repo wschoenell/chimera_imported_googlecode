@@ -1,3 +1,28 @@
+2007-11-14  P. Henrique Silva  <henrique@astro.ufsc.br>
+
+	* tests
+	* tests/managerhelperwithmainexception.py
+	* tests/test_classloader.py
+	* tests/managerhelperwithstopexception.py
+	* tests/classloaderhelperfoundnotworking1.py
+	* tests/classloaderhelperfoundnotworking2.py
+	* tests/classloaderhelperworking.py
+	* tests/test_chimera_object.py
+	* tests/classloaderhelperfoundwithoutclass.py
+	* tests/test_events.py
+	* tests/managerhelperwithstartexception.py
+	* tests/test_config.py
+	* tests/test_location.py
+	* tests/test_manager.py
+	* tests/test_resources.py
+	* tests/managerhelperwithinitexception.py
+	* tests/managerhelper.py
+	* tests/managerhelperwitherror.py
+	* tests/test_main.py
+	* tests/test_version.py
+
+	New core test suite using nosetests.
+
 2007-10-26  P. Henrique Silva  <henrique@astro.ufsc.br>
 
 	* setup-chimera.sh:
