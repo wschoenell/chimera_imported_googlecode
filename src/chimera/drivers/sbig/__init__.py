@@ -22,4 +22,4 @@
 ## drivers packaged (as this one) should import the corresponding driver on __init__
 ##
 
-from sbig import SBIG
+from chimera.drivers.sbig.sbig import SBIG

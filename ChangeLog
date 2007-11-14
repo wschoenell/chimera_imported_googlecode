@@ -1,5 +1,29 @@
 2007-11-14  P. Henrique Silva  <henrique@astro.ufsc.br>
 
+	* src/chimera/interfaces/lifecycle.py: New state methods
+	names. new methods to get Location, Manager and Proxy.
+
+	* src/chimera/controllers/siteconfig.py:
+	* src/chimera/controllers/chimeramain.py:
+
+	Moved from core. It's not core, it's a normal controller.
+
+	* src/chimera/instruments/tests
+	* src/chimera/instruments/tests/test_telescope.py: New test suite
+	(not complete yet).
+
+	* src/chimera/util/enum.py: New enum class. (PyPI enum)
+
+	* src/chimera/drivers/sbig/__init__.py: Fix relative import use.
+
+	* docs/examples/client.py:
+	* docs/examples/proxy.py:
+	* docs/examples/server.py: New examples.
+
+	* TODO: Added todo's from chimera-ng branch.
+
+2007-11-14  P. Henrique Silva  <henrique@astro.ufsc.br>
+
 	* core/classloader.py: New classloader. Contains code moved from
 	manager.py and improved exception handling.
 
