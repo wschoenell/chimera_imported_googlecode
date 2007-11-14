@@ -19,9 +19,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-import logging
+from chimera.util.enum import Enum
 
-logging.basicConfig(level=logging.WARNING,
-                    format='%(asctime)s %(levelname)s %(module)s:%(lineno)d %(message)s',
-                    datefmt='%d-%m-%Y %H:%M:%S (%j)')
+State = Enum ('RUNNING',
+              'STOPPED')
 

@@ -19,9 +19,15 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-import logging
+import socket
 
-logging.basicConfig(level=logging.WARNING,
-                    format='%(asctime)s %(levelname)s %(module)s:%(lineno)d %(message)s',
-                    datefmt='%d-%m-%Y %H:%M:%S (%j)')
+MANAGER_DEFAULT_HOST = socket.gethostname()
+MANAGER_DEFAULT_PORT = 7666
 
+MANAGER_LOCATION = '/Manager/manager'
+
+EVENT_ATTRIBUTE_NAME  = '__event__'
+CONFIG_ATTRIBUTE_NAME = '__config__'
+
+EVENTS_PROXY_NAME = '__events_proxy__'
+CONFIG_PROXY_NAME = '__config_proxy__'

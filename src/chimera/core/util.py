@@ -19,9 +19,18 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-import logging
+from chimera.core.constants import MANAGER_DEFAULT_HOST, MANAGER_DEFAULT_PORT, MANAGER_LOCATION
 
-logging.basicConfig(level=logging.WARNING,
-                    format='%(asctime)s %(levelname)s %(module)s:%(lineno)d %(message)s',
-                    datefmt='%d-%m-%Y %H:%M:%S (%j)')
+try:
+    import Pyro.core
+except ImportError, e:
+    raise RuntimeError ("You must have Pyro version >= 3.6 installed.")
+
+def getManagerURI (host = None, port = None):
+
+    host = host or MANAGER_DEFAULT_HOST
+    port = port or MANAGER_DEFAULT_PORT
+    
+    return Pyro.core.PyroURI(host, MANAGER_LOCATION, port)
+
 
