@@ -70,6 +70,8 @@ class SBIG(ChimeraObject, ICameraDriver, IFilterWheelDriver):
 
 	self["bitpix"] = Bitpix.uint16
                         
+	self["bitpix"] = Bitpix.uint16
+                        
         return self.open(self.dev)
 
     def __stop__ (self):
@@ -111,6 +113,7 @@ class SBIG(ChimeraObject, ICameraDriver, IFilterWheelDriver):
         except SBIGException:
             pass
 
+    @lock
     def ping(self):
         return self.drv.isLinked()
 
@@ -127,7 +130,6 @@ class SBIG(ChimeraObject, ICameraDriver, IFilterWheelDriver):
         else:
             return False
 
-    @lock
     def abortExposure(self):
 
         if not self.isExposing():
@@ -150,21 +152,26 @@ class SBIG(ChimeraObject, ICameraDriver, IFilterWheelDriver):
                                  self["temp_setpoint"])
         return True
 
+    @lock
     def stopCooling(self):
         self.drv.setTemperature (False,
                                  self["temp_setpoint"])
 
         return True
 
+    @lock
     def isCooling(self):
         return bool(self.drv.getTemperature()[0])
 
+    @lock
     def getTemperature(self):
         return self.drv.getTemperature()[-1]
 
+    @lock
     def getSetpoint(self):
         return self.drv.getTemperature()[-2]
 
+    @lock
     def getFilter (self):
         # Chimera uses filter starting with 0
         position = self.drv.getFilterPosition()
@@ -271,7 +278,7 @@ class SBIG(ChimeraObject, ICameraDriver, IFilterWheelDriver):
 
         self.drv.startReadout(self.ccd, 0)
         
-	for line in range(readoutMode.height):
+        for line in range(readoutMode.height):
 	
             img[line] = self.drv.readoutLine(self.ccd, 0)
 

@@ -143,19 +143,23 @@ class FakeTelescope (ChimeraObject,
     def getTargetAzAlt(self):
         return Position.fromRaDec(self.getAz(), self.getAlt())
 
+    @lock
     def sync(self, position):
         self._ra  = position.ra
         self._dec = position.dec
 
+    @lock
     def park(self):
         self._parked = True
 
+    @lock
     def unpark(self):
         self._parked = False
 
     def isParked(self):
         return self._parked
 
+    @lock
     def setParkPosition (self, position):
         pass
 

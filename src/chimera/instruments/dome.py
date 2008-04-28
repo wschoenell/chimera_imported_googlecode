@@ -162,11 +162,9 @@ class Dome(ChimeraObject, IDome):
           tel = self.getTelescope()
           self.queue.put(tel.getAz())
 
-     @lock
      def getDriver(self):
           return self.getManager().getProxy(self['driver'], lazy=True)        
         
-     @lock
      def getTelescope(self):
           return self.getManager().getProxy(self['telescope'], lazy=True)        
 
@@ -224,6 +222,7 @@ class Dome(ChimeraObject, IDome):
      def getMode(self):
           return self._mode
 
+     @lock
      def slewToAz (self, az):
 
           if not isinstance(az, Coord):
@@ -239,7 +238,6 @@ class Dome(ChimeraObject, IDome):
           return self.drv.isSlewing ()
     
      def abortSlew (self):
-          # FIXME
           drv = self.getDriver()
           drv.abortSlew ()
 
@@ -247,10 +245,12 @@ class Dome(ChimeraObject, IDome):
           drv = self.getDriver()
           return drv.getAz ()
 
+     @lock
      def openSlit (self):
           drv = self.getDriver()
           drv.openSlit()
 
+     @lock
      def closeSlit (self):
           drv = self.getDriver()
           drv.closeSlit()

@@ -18,9 +18,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# metadata definition used by setup.py and onthers
+# metadata definition used by setup.py and others
 
-_chimera_version_          = "0.1"
+_chimera_version_          = "0.1.2"
 _chimera_name_             = "chimera"
 _chimera_requires_         = ""
 _chimera_provides_         = "chimera-core"

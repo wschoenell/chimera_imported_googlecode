@@ -36,6 +36,7 @@ import chimera.core.log
 #chimera.core.log.setConsoleLevel(logging.INFO)
 log = logging.getLogger("chimera.tests")
 
+
 from nose.tools import assert_raises
 
 
@@ -78,7 +79,7 @@ class TestCamera (object):
         self.manager.shutdown()
         del self.manager
 
-    def test_simplest (self):
+    def test_simples (self):
 
         cam = self.manager.getProxy(Camera)
 
@@ -86,6 +87,8 @@ class TestCamera (object):
 
     def test_normal_expose (self):
 
+        print
+        
         cam = self.manager.getProxy(Camera)
 
         frames = 0
@@ -157,7 +160,7 @@ class TestCamera (object):
         def doExpose():
             # need to get another Proxy as Proxies cannot be shared among threads
             cam = self.manager.getProxy(Camera)
-            cam.expose(exp_time=600, filename="test_expose_abort.fits")
+            cam.expose(exp_time=20, filename="test_expose_abort.fits")
         
         self.manager.getPool().queueTask(doExpose)
 

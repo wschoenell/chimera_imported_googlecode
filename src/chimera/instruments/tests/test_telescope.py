@@ -44,10 +44,16 @@ class TestTelescope (object):
 
         self.manager = Manager(port=8000)
 
-        self.manager.addClass(Site, "lna", {"name": "LNA",
-                                            "latitude": "-22 32 03",
-                                            "longitude": "-45 34 57",
-                                            "altitude": "1896",
+        #self.manager.addClass(Site, "lna", {"name": "LNA",
+        #                                    "latitude": "-22 32 03",
+        #                                    "longitude": "-45 34 57",
+        #                                    "altitude": "1896",
+        #                                    "utc_offset": "-3"})
+
+        self.manager.addClass(Site, "lna", {"name": "UFSC",
+                                            "latitude": "-27 36 13 ",
+                                            "longitude": "-48 31 20",
+                                            "altitude": "20",
                                             "utc_offset": "-3"})
 
         #self.manager.addClass(Meade, "meade", {"device": "/dev/ttyS6"})
@@ -68,6 +74,10 @@ class TestTelescope (object):
             print time.time(), "Slew complete. position=%s" % str(position)
 
         @callback(self.manager)
+        def abortCompleteClbk(position):
+            print time.time(), "Abort complete. position=%s" % str(position)
+
+        @callback(self.manager)
         def syncCompleteClbk(position):
             print time.time(), "Sync complete. position=%s" % str(position)
 
@@ -82,6 +92,7 @@ class TestTelescope (object):
         self.tel = self.manager.getProxy(Telescope)
         self.tel.slewBegin      += slewBeginClbk
         self.tel.slewComplete   += slewCompleteClbk
+        self.tel.abortComplete  += abortCompleteClbk
         self.tel.syncComplete   += syncCompleteClbk
         self.tel.parkComplete   += parkCompleteClbk
         self.tel.unparkComplete += unparkCompleteClbk
@@ -92,10 +103,32 @@ class TestTelescope (object):
         ra  = self.tel.getRa()
         dec = self.tel.getDec()
 
+        print
         print "current position:", self.tel.getPositionRaDec()
-        print "moving to:", (ra-"00 40 00"), (dec-"00 40 00")
+        print "moving to:", (ra-"1 00 00"), (dec-"15 00 00")
 
-        self.tel.slewToRaDec((ra-"00 40 00", dec-"00 40 00"))
+        self.tel.slewToRaDec((ra-"1 00 00", dec-"15 00 00"))
+
+        print "new position:", self.tel.getPositionRaDec()
+
+    def test_abort_slew (self):
+
+        ra  = self.tel.getRa()
+        dec = self.tel.getDec()
+
+        print
+        print "current position:", self.tel.getPositionRaDec()
+        print "moving to:", (ra-"10 00 00"), (dec-"10 00 00")
+
+        def slew():
+            t = copy.copy(self.tel)
+            t.slewToRaDec((ra-"10 00 00", dec-"10 00 00"))
+
+        Thread(target=slew).start()
+
+        time.sleep(3)
+
+        self.tel.abortSlew()
 
         print "new position:", self.tel.getPositionRaDec()
 
@@ -125,7 +158,6 @@ class TestTelescope (object):
             print self.tel.getPositionRaDec(), self.tel.getPositionAzAlt()
             sys.stdout.flush()
             
-        
         print
 
         ra  = self.tel.getRa()

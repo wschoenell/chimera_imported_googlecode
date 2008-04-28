@@ -8,6 +8,7 @@ import tempfile
 import pwd
 import logging
 import time
+import sys
 
 # ask to use numpy
 os.environ["NUMERIX"] = "numpy"
@@ -121,6 +122,9 @@ class ImageSave (object):
             if bitpix == Bitpix.uint16:
                 hdu.scale('int16', '', bzero=32768)
 
+            if bitpix == Bitpix.uint16:
+                hdu.scale('int16', '', bzero=32768)
+
             # add basic header (DATE, DATE-OBS) as this information can get lost
             # any other header should be added later by the controller
             fits_date_format = "%Y-%m-%dT%H:%M:%S"
@@ -133,7 +137,7 @@ class ImageSave (object):
             
             hdu.header.update("DATE", file_date, "date of file creation")
             hdu.header.update("DATE-OBS", obs_date, "date of the observation")
-            
+
             fits = pyfits.HDUList([hdu])
             fits.writeto(finalname)
             
