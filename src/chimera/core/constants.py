@@ -20,6 +20,8 @@
 
 
 import socket
+import os.path
+import sys
 
 #MANAGER_DEFAULT_HOST = socket.gethostname()
 MANAGER_DEFAULT_HOST = 'localhost'
@@ -43,3 +45,15 @@ RWLOCK_ATTRIBUTE_NAME           = '__rwlock__'
 CONFIG_ATTRIBUTE_NAME  = '__config__'
 EVENTS_ATTRIBUTE_NAME  = '__events__'
 METHODS_ATTRIBUTE_NAME = '__methods__'
+
+# system config
+if sys.platform == "win32":
+    SYSTEM_CONFIG_DIRECTORY        = os.path.expanduser('~/chimera')
+else:
+    SYSTEM_CONFIG_DIRECTORY        = os.path.expanduser('~/.chimera')
+    
+SYSTEM_CONFIG_DEFAULT_FILENAME = os.path.join(SYSTEM_CONFIG_DIRECTORY, 'chimera.config')
+SYSTEM_CONFIG_DEFAULT_SAMPLE   = os.path.join(os.path.dirname(__file__), 'chimera.config.sample')
+SYSTEM_CONFIG_DEFAULT_GLOBAL   = os.path.join(os.path.dirname(__file__), 'chimera.global.config')
+
+SYSTEM_CONFIG_LOG_NAME = os.path.join(SYSTEM_CONFIG_DIRECTORY, 'chimera.log')

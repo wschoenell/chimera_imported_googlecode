@@ -19,6 +19,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
+from chimera.core.constants    import SYSTEM_CONFIG_LOG_NAME
+
 import logging
 import logging.handlers
 import sys
@@ -53,41 +55,29 @@ class ChimeraFormatter (logging.Formatter):
         finally:
             stream.close()
 
-        
 fmt = ChimeraFormatter(fmt='%(asctime)s.%(msecs)d %(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s',
                        datefmt='%d-%m-%Y %H:%M:%S')
-
-try:
-    if not os.path.exists(os.path.expanduser("~/.chimera")):
-        os.mkdir(os.path.expanduser("~/.chimera/"))
-except Exception:
-    pass
-
-fileHandler = None
-
-try:
-    fileHandler = logging.handlers.RotatingFileHandler(os.path.expanduser("~/.chimera/chimera.log"),
-                                                       maxBytes=5*1024*1024, backupCount=10)
-except Exception:
-    pass
-
-consoleHandler = logging.StreamHandler(sys.stderr)
-
-if fileHandler:
-    fileHandler.setFormatter(fmt)
-    fileHandler.setLevel(logging.DEBUG)
-
-consoleHandler.setFormatter(fmt)
-consoleHandler.setLevel(logging.WARNING)
 
 root = logging.getLogger("chimera")
 root.setLevel(logging.DEBUG)
 
-if fileHandler:
-    root.addHandler(fileHandler)
-    
-root.addHandler(consoleHandler)
+# early log system (just console)
 
+global consoleHandler
+        
+consoleHandler = logging.StreamHandler(sys.stderr)
+consoleHandler.setFormatter(fmt)
+consoleHandler.setLevel(logging.WARNING)
+root.addHandler(consoleHandler)
 
 def setConsoleLevel (level):
     consoleHandler.setLevel(level)
+
+try:
+    fileHandler = logging.handlers.RotatingFileHandler(SYSTEM_CONFIG_LOG_NAME,
+                                                       maxBytes=5*1024*1024, backupCount=10)
+    fileHandler.setFormatter(fmt)
+    fileHandler.setLevel(logging.DEBUG)
+    root.addHandler(fileHandler)
+except Exception, e:
+    root.warning("Couldn't start Log System FileHandler (%s)" % e)

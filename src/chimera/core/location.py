@@ -21,11 +21,11 @@
 
 import re
 
-import logging
 import chimera.core.log
+import logging
 log = logging.getLogger(__name__)
 
-from types import DictType, StringType
+from types import StringType
 
 from chimera.core.exceptions import InvalidLocationException
 

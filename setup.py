@@ -48,6 +48,7 @@ from chimera.core.version import  _chimera_version_,		\
 
 chimera_scripts = ['src/scripts/chimera',
                    'src/scripts/chimera-cam',
+                   'src/scripts/chimera-admin',
                    'src/scripts/chimera-tel',
                    'src/scripts/chimera-dome',
                    'src/scripts/chimera-focus',
@@ -55,17 +56,25 @@ chimera_scripts = ['src/scripts/chimera',
 
 # setup
 
-linux_deps = []
-win32_deps = []
+linux_deps = linux_cdeps = []
+win32_deps = win32_cdeps = []
 
 # FIXME:
 # coords needs an egg to works on Windows, at least without requiring the user to compile TPM
 # on Windows, requires numpy 1.0.4 'cause newer version still doesn't have an egg
+# and older matplotlib which doesn't require numpy >= 1.1.0
+
+# FIXME: pywcs only works on python 2.5
 
 if sys.platform == "win32":
+    win32_cdeps = ["matplotlib == 0.91.4", "numpy == 1.0.4"]
     win32_deps += ["pywin32 == 210"]
 else:
+    linux_cdeps = ["matplotlib == 0.98.1", "numpy==1.1.0"]
     linux_deps += ["python-sbigudrv >= 0.1", "coords"]
+
+    if sys.version_info[0:2] >= (2,5):
+        linux_deps += ["pywcs"]
 
 setup(name='chimera-python',
       package_dir      = {"": "src"},
@@ -75,25 +84,28 @@ setup(name='chimera-python',
 
       zip_safe         = False,
 
-      install_requires = ["Pyro >= 3.7",
-                          "pyfits >= 1.3",
-                          "pyserial >= 2.2",
+      # dependencies are installed bottom up, so put important things last
+      install_requires = linux_deps + win32_deps + \
+                         ["PyYAML >= 3.0.5",
+                          "asciidata == 1.1",
                           "sqlalchemy >= 0.4.5",
                           "Elixir >= 0.5.2",
                           "pyephem > 3.7",
                           "python-dateutil >= 1.4",
-                          "RO >= 2.2.7",
-                          "matplotlib == 0.98.1",
-                          "numpy == 1.0.4"] + win32_deps + linux_deps,
+                          "RO >= 2.2.7",                          
+                          "pyfits >= 1.3",
+                          "pyserial >= 2.2",
+                          "Pyro >= 3.7"] + linux_cdeps + win32_cdeps,
 
-      dependency_links = ["http://www.stsci.edu/resources/software_hardware/pyfits/pyfits-1.3.tar.gz",
-                          "http://astropy.scipy.org/svn/astrolib/trunk/coords#egg=coords==trunk",
-                          "http://sourceforge.net/project/showfiles.php?group_id=46487"],
+      dependency_links = ["/home/vela/henrique/chimera-depend",
+                          "http://www.stsci.edu/resources/software_hardware/pyfits/pyfits-1.3.tar.gz",
+                          "http://astropy.scipy.org/svn/astrolib/trunk/coords#egg=coords",
+                          "http://astropy.scipy.org/svn/astrolib/trunk/pywcs#egg=pywcs",
+                          "http://sourceforge.net/project/showfiles.php?group_id=46487",
+                          "http://www.stecf.org/software/PYTHONtools/astroasciidata/asciidata1.1_download.php"],
 
-      tests_require    = ["nose"],
-      test_loader      = "nose.loader:TestLoader",
-      test_suite       = "src/chimera/core",
-            
+      tests_require    = ["nose", "coverage"],
+
       version          = _chimera_version_,
       description      = _chimera_description_,
       long_description = open("docs/site/index.rst").read(),

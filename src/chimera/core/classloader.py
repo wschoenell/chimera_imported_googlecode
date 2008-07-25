@@ -43,8 +43,8 @@ class ClassLoader (object):
         by Jorgen Hermann
         """
 
-        if clsname in self._cache:
-            return self._cache[clsname]
+        if clsname.lower() in self._cache:
+            return self._cache[clsname.lower()]
 
         sys.path = path + sys.path
 
@@ -80,11 +80,19 @@ class ClassLoader (object):
         # turns sys.path back
         [sys.path.remove (p) for p in path]
         
-        if not clsname in vars(module).keys():
-            raise ClassLoaderException ("Module found but there are no class named %s on module '%s' (%s)." %
-                                        (clsname, clsname.lower(), module.__file__))
+        
+        cls = None
+        
+        for k, v in vars(module).items():
+            if k.lower() == clsname.lower():
+                cls = v
+                break
+        
+        if not cls:
+            raise ClassLoaderException ("Module found but couldn't fount class on module '%s' (%s)." %
+                                        (clsname.lower(), module.__file__))
 
-        self._cache[clsname] = vars(module)[clsname]
+        self._cache[clsname.lower()] = cls
 
-        return self._cache[clsname]
+        return self._cache[clsname.lower()]
 
