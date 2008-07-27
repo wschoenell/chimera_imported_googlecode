@@ -190,7 +190,7 @@ class Dome(ChimeraObject, IDome):
           drv = self.getDriver()
 
           if self.getMode() == Mode.Stand:
-               self.log.debug("[control] standing...")
+               #self.log.debug("[control] standing...")
                return True
 
           if not self.queue.empty():

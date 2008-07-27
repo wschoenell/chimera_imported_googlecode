@@ -166,6 +166,13 @@ class SystemConfig (object):
         for type, values in config.items():
             if type.lower() == "chimera":
                 self.chimera.update(values)
+                # BIGGG FIXME: read all files before create Locations, to avoid this hack
+                if "host" in values or "port" in values:
+                   # host/port changed
+                   for l in self.drivers+self.instruments+self.controllers:
+                       l._host = values["host"]
+                       l._port = values["port"]            
+                 
                 del config[type]
                 break
             
@@ -175,8 +182,9 @@ class SystemConfig (object):
         
         if "port" not in self.chimera:
             self.chimera["port"] = MANAGER_DEFAULT_PORT
-        
 
+            
+        
         for type, values in config.items():
 
             key = type.lower()

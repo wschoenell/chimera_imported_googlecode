@@ -6,7 +6,4 @@
 <pydev_pathproperty name="org.python.pydev.PROJECT_SOURCE_PATH">
 <path>/chimera-new-scripts/src</path>
 </pydev_pathproperty>
-<pydev_pathproperty name="org.python.pydev.PROJECT_EXTERNAL_SOURCE_PATH">
-<path>/home/henrique/chimera/Pyro-3.7</path>
-</pydev_pathproperty>
 </pydev_project>

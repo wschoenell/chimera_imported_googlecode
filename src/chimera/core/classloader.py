@@ -46,6 +46,9 @@ class ClassLoader (object):
         if clsname.lower() in self._cache:
             return self._cache[clsname.lower()]
 
+        if not isinstance(path, (list, tuple)):
+            path = [path]
+            
         sys.path = path + sys.path
 
         try:

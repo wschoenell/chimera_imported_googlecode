@@ -1,3 +1,28 @@
+2008-07-27  P. Henrique Silva  <henrique@astro.ufsc.br>
+
+	*** chimera-new-scripts branch ***
+
+	* src/chimera/core/cli.py: Much better implementation of
+	_getObjects method. Working with most configurations of
+	local/remote instrument/driver. Needs test cases for promotion to
+	stable branch.
+
+	* .project:
+	* .pydevproject: updated to branch project.
+
+	* src/chimera/core/chimera.config.sample
+	* src/chimera/core/chimera.sample.config: Rename.
+	* src/chimera/core/constants.py: Updated for above rename.
+
+	* src/chimera/core/classloader.py: Accepts string paths.
+	* src/chimera/core/manager.py: Add exception handling on daemon
+	start.
+	* src/chimera/core/systemconfig.py: Hack! need better
+	implementation of multiple yaml files handling (location creation
+	versus host/port config)
+	* src/chimera/instruments/dome.py: less verbose dome.
+
+
 2008-07-10  P. Henrique Silva  <henrique@astro.ufsc.br>
 
 	* src/chimera/core/path.py: New way to get Chimera paths. Use
