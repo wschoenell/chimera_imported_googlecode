@@ -29,30 +29,35 @@ class ChimeraDome (ChimeraCLI):
         ChimeraCLI.__init__(self, "chimera-dome", "Dome controller", 0.1)
     
 
-        self.addGroup("DOME", "Dome")
-        self.addInstrument(name="dome", cls="Dome", help="Dome instrument to be used", group="DOME")
-        self.addDriver(instrument="dome", name="driver", short="d", help="Dome driver to be used", group="DOME")
+        self.addHelpGroup("DOME", "Dome")
+        self.addInstrument(name="dome", cls="Dome", help="Dome instrument to be used", helpGroup="DOME")
+        self.addDriver(instrument="dome", name="driver", short="d", help="Dome driver to be used", helpGroup="DOME")
 
-        self.addGroup("TELESCOPE", "Telescope Tracking Configuration")
-        self.addParameters(dict(name="telescope", group="TELESCOPE",
+        self.addHelpGroup("TELESCOPE", "Telescope Tracking Configuration")
+        self.addParameters(dict(name="telescope", helpGroup="TELESCOPE",
                                 help="Tell the dome to follow TELESCOPE when tracking (only "
                                 "utilized when calling --track"))
-
-        self.addGroup("ACTIONS", "Commands")        
         
-    @action(help="Open dome slit", group="ACTIONS")
+        self.addHelpGroup("COMMANDS", "Commands")
+        
+        self.addActionGroup("SLIT")
+        self.addActionGroup("TRACKING")
+        self.addActionGroup("INFO")     
+        self.addActionGroup("SLEW")        
+
+    @action(help="Open dome slit", helpGroup="COMMANDS", actionGroup="SLIT")
     def open(self, options):
         self.out("Opening dome slit ... ")
         options.dome.openSlit()
         self.out("OK\n")
     
-    @action(help="Close dome slit", group="ACTIONS")
+    @action(help="Close dome slit", helpGroup="COMMANDS", actionGroup="SLIT")
     def close(self, options):
         self.out("Closing dome slit ... ")
         options.dome.closeSlit()
         self.out("OK\n")
 
-    @action(help="Track the telescope", group="ACTIONS")
+    @action(help="Track the telescope", helpGroup="COMMANDS", actionGroup="TRACKING")
     def track(self, options):
         self.out("Activating tracking ... ")
 
@@ -62,14 +67,14 @@ class ChimeraDome (ChimeraCLI):
         options.dome.track()
         self.out("OK\n")
 
-    @action(help="Stop tracking the telescope (stand)", group="ACTIONS")
+    @action(help="Stop tracking the telescope (stand)", helpGroup="COMMANDS", actionGroup="TRACKING")
     def stand(self, options):
         self.out("Deactivating tracking ... ")
         options.dome.stand()
         self.out("OK\n")
 
     @action(long="to", type="string",
-            help="Move dome to AZ azimuth", metavar="AZ", group="ACTIONS")
+            help="Move dome to AZ azimuth", metavar="AZ", helpGroup="COMMANDS", actionGroup="SLEW")
     def moveTo(self, options):
         
         try:
@@ -81,7 +86,7 @@ class ChimeraDome (ChimeraCLI):
         options.dome.slewToAz(target)
         self.out("OK\n")
     
-    @action(help="Print dome information", group="ACTIONS")
+    @action(help="Print dome information", helpGroup="COMMANDS", actionGroup="INFO")
     def info(self, options):
 
         self.out("Dome: %s (%s).\n" % (options.dome["driver"], options.dome.getDriver()["device"]))

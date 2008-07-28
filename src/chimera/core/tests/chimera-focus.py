@@ -27,7 +27,7 @@ class ChimeraFocus (ChimeraCLI):
     def __init__ (self):
         ChimeraCLI.__init__(self, "chimera-focus", "Focuser controller", 0.1)
         
-        self.addGroup("ACTIONS", "Actions")
+        self.addHelpGroup("ACTIONS", "Actions")
         
         self.addInstrument(name="focuser", cls="Focuser", help="Focuser instrument to be used")
         self.addDriver(instrument="focuser", name="driver", short="d", help="Focuser driver to be used")        

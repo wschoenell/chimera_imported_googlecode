@@ -1,3 +1,21 @@
+2008-07-28  P. Henrique Silva  <henrique@astro.ufsc.br>
+
+	* src/chimera/core/cli.py:
+	Add support for multiple actions groups. For each action group,
+	only one action can be specified. This enables multiple actions
+	handlind as specified in issue 9. But, this is not final yet as
+	the order in which the actions run is not the same as user
+	specified. Working on this now, commit just to create a runnable
+	snapshot.
+
+	Fix bug on _validateParameter: now validating only specified
+	options (was trying to validate all independent of what user
+	specified).
+
+	* src/chimera/core/tests/chimera-dome.py:
+	* src/chimera/core/tests/chimera-focus.py: Update to new helpGroup
+	option.
+
 2008-07-27  P. Henrique Silva  <henrique@astro.ufsc.br>
 
 	*** chimera-new-scripts branch ***
