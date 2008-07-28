@@ -1,5 +1,11 @@
 2008-07-28  P. Henrique Silva  <henrique@astro.ufsc.br>
 
+	* src/chimera/core/cli.py: Fix multiple actions execution order:
+	Respect command line order, always! There are no static
+	priorities, just user will.
+
+2008-07-28  P. Henrique Silva  <henrique@astro.ufsc.br>
+
 	* src/chimera/core/cli.py:
 	Add support for multiple actions groups. For each action group,
 	only one action can be specified. This enables multiple actions

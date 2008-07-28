@@ -14,6 +14,8 @@ import optparse
 import os.path
 
 __all__ = ['ChimeraCLI',
+           'Action',
+           'Parameter',
            'action',
            'parameter']
 
@@ -136,10 +138,6 @@ def parameter(*args, **kwargs):
     method name. If type given, parameter will be checked to match
     'type'. The default value, if any, shoud be passed on 'default'.
 
-    There are two specials parameter types: INSTRUMENT, DRIVER. They
-    receive the same keyword arguments as normal parameters, but receive
-    special treatment (detailed below in InstrumentDriverCheckers).
-
     See L{Parameter} for information about valid keywork arguments.
     """
 
@@ -172,6 +170,32 @@ class InstrumentDriverCheckers:
 
         setattr(parser.values, "%s" % option.dest, value)
     
+
+class CLIValues (object):
+    """This class mimics optparse.Values class, but add an order list to keep track of the order
+    in which the command line parameters was parser. This is important to ChimeraCLI to keep CLI's
+    with very high level of usability.
+    
+    For every option the parser, OptionParser will call setattr to store the command line value,
+    we just keep track of the order and ChimeraCLI does the rest.
+    """
+
+    def __init__ (self, defaults=None):
+        
+        if defaults:
+            for (attr, val) in defaults.items():
+                setattr(self, attr, val)
+        
+        object.__setattr__(self, '__order__', [])
+        
+    def __setattr__ (self, attr, value):
+
+        object.__setattr__(self, attr, value)
+        
+        if hasattr(self, '__order__'):
+            order = object.__getattribute__(self, '__order__')
+            order.append(attr)
+        
 
 class ChimeraCLI (object):
     """
@@ -289,7 +313,7 @@ class ChimeraCLI (object):
 
         self._needDriversPath = driver_path
         self._needInstrumentsPath = instrument_path
-        self._needCOntrollersPath = controllers_path
+        self._needControllersPath = controllers_path
 
     def out(self, msg):
         sys.stdout.write(msg)
@@ -376,11 +400,10 @@ class ChimeraCLI (object):
         self._createParser()
 
         # run the parser
-        self.options, args = self.parser.parse_args(cmdlineArgs)
-
+        self.options, args = self.parser.parse_args(cmdlineArgs, values=CLIValues(defaults=self.parser.get_default_values().__dict__))
+        
         # check which actions should run and if there is any conflict
         actions = self._getActions(self.options)
-        print actions
 
         if not actions:
             self.exit("Please select one action or --help for more information.\n")
@@ -637,27 +660,17 @@ class ChimeraCLI (object):
 
     def _getActions(self, options):
 
-        invalidActions = [ self._actions[action] for action in self._actions.keys() if getattr(options,action) not in (False,None) ]
+        # actions in command line (and run) order
+        actions = [ self._actions[action] for action in self.options.__order__ if action in self._actions ]
         
-        if not invalidActions: return []
+        if not actions: return []
         
-        validActions = []
-        
-        for group in self._actionGroups:
-            
-            actions = [action for action in invalidActions if action.actionGroup == group]
-            
-            if not actions: continue
-            
-            if len(actions) > 1:
-                self.exit("Cannot use %s and %s at the same time.\n" % (actions[0].long, actions[1].long))
-            else:
-                validActions.append(invalidActions.pop(invalidActions.index(actions[0])))
-                
-        # no action should remains unvalidate
-        assert not invalidActions
-                
-        return validActions
+        for action in actions:
+            for other in actions:
+                if action != other and action.actionGroup == other.actionGroup:
+                    self.exit("Cannot use %s and %s at the same time.\n" % (actions.long, other.long))
+
+        return actions
 
     def _validateParameters(self, options):
 
