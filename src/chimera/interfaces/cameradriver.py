@@ -43,35 +43,18 @@ CCD = Enum ("IMAGING",
 class ICameraDriver(Interface):
 
     # config
-    __config__ = {"device"	     : Device.USB,
+    __config__ = {"device"         : Device.USB,
                   "ccd"          : CCD.IMAGING,
                   
-                  "exp_time"         : (0.0, 216000.0), # seconds
-                  "shutter" 	     : Shutter.OPEN,
-
-                  "readout_aborted"  : True,
-
                   "temp_setpoint"    : 20.0,
                   "temp_delta"       : 1.0,
-                  
-                  # drivers should use SaveImage utility class to
-                  # handles this values according to the semantics
-                  # defined in ICamera spec.
-                  "window_x"         : 0.5,
-                  "window_y"         : 0.5,
-                  "window_width"     : 1.0,
-                  "window_height"    : 1.0,
 
-                  "binning"	     :  Binning._1x1,
-                  #"gain"            : 1.0,
-                  
-                  # FITS generation parameters
-                  "date_format"	     : "%d%m%y-%H%M%S",
-                  "file_format"	     : "$date",
-                  "file_extension"   : "fits",
-                  "directory"	     : "$HOME/images", # environment variables allowed
-                  "save_on_temp"     : True,
-                  "bitpix"           : Bitpix.int16,
+                  "camera_model"    : "Fake camera Inc.",
+                  "ccd_model"       : "KAF XYZ 10",
+                  "ccd_dimension_x" : 100,  # pixel
+                  "ccd_dimension_y" : 100,  # pixel
+                  "ccd_pixel_size_x": 10.0, # micrometer (without binning factors)
+                  "ccd_pixel_size_y": 10.0  # micrometer (without binning factors)
                   }
                   
     # methods
@@ -86,12 +69,28 @@ class ICameraDriver(Interface):
         pass
 
     def isExposing(self):
+        """
+        @return:   Return the currently exposing shepherd, or false
+        @rtype:    boolean or chimera.controllers.imageserver.shepherd.Shepherd
+        """
         pass
 
-    def expose(self):
+    def expose(self, shepherd):
         pass
 
-    def abortExposure(self):
+    def getBinnings(self):
+        """Return the allowed binning settings for this camera
+        
+        @return: Dictionary with the keys being the English binning description (caption), and 
+                 the values being a device-specific value needed to activate the described binning
+        @rtype: dictionary
+        """
+        return {'1x1': 0}
+    
+    def getDeviceSize(self):
+        return (0,0)
+
+    def abortExposure(self, readout = False):
         pass
 
     def startCooling(self):
