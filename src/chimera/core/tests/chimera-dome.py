@@ -27,15 +27,18 @@ class ChimeraDome (ChimeraCLI):
     
     def __init__ (self):
         ChimeraCLI.__init__(self, "chimera-dome", "Dome controller", 0.1)
-        
-        self.addGroup("ACTIONS", "Actions")
-        
-        self.addInstrument(name="dome", cls="Dome", help="Dome instrument to be used")
-        self.addDriver(instrument="dome", name="driver", short="d", help="Dome driver to be used")
-        
-        self.addParameters(dict(name="telescope",
+    
+
+        self.addGroup("DOME", "Dome")
+        self.addInstrument(name="dome", cls="Dome", help="Dome instrument to be used", group="DOME")
+        self.addDriver(instrument="dome", name="driver", short="d", help="Dome driver to be used", group="DOME")
+
+        self.addGroup("TELESCOPE", "Telescope Tracking Configuration")
+        self.addParameters(dict(name="telescope", group="TELESCOPE",
                                 help="Tell the dome to follow TELESCOPE when tracking (only "
                                 "utilized when calling --track"))
+
+        self.addGroup("ACTIONS", "Commands")        
         
     @action(help="Open dome slit", group="ACTIONS")
     def open(self, options):
@@ -80,7 +83,7 @@ class ChimeraDome (ChimeraCLI):
     
     @action(help="Print dome information", group="ACTIONS")
     def info(self, options):
-        
+
         self.out("Dome: %s (%s).\n" % (options.dome["driver"], options.dome.getDriver()["device"]))
         self.out("Current dome azimuth: %s.\n" % options.dome.getAz())
         if options.dome.isSlitOpen():
@@ -95,4 +98,4 @@ if __name__ == '__main__':
     cli = ChimeraDome()
     ret = cli.run(sys.argv)
     sys.exit(ret)
-    
+

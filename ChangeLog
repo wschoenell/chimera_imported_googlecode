@@ -2,6 +2,17 @@
 
 	*** chimera-new-scripts branch ***
 
+	* src/chimera/core/cli.py:
+	Add Local Mnager host/port configuration.
+	Add include path options.
+
+	* src/chimera/core/tests/chimera-dome.py: Updated groups for
+	better help message.
+
+2008-07-27  P. Henrique Silva  <henrique@astro.ufsc.br>
+
+	*** chimera-new-scripts branch ***
+
 	* src/chimera/core/cli.py: Much better implementation of
 	_getObjects method. Working with most configurations of
 	local/remote instrument/driver. Needs test cases for promotion to
