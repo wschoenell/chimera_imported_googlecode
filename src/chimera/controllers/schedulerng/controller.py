@@ -57,28 +57,29 @@ class Controller(ChimeraObject):
         session.flush()
         
     def process(self, exposure):
-        self.proxies['telescope']._transferThread()
-        self.proxies['dome']._transferThread()
-        self.proxies['camera']._transferThread()
-        self.proxies['filterwheel']._transferThread()
-        if exposure.observation==None:            
-            raise ObjectNotFoundException('Unable to find associated observation')
-        self.log.debug('Attempting to slew telescope to ' + exposure.observation.targetPos.__str__())
-        self.proxies['telescope'].slewToRaDec(exposure.observation.targetPos)
-        while (self.proxies['telescope'].isSlewing() | self.proxies['dome'].isSlewing()):
-            self.log.debug('Waiting for slew to finish. Dome: ' + self.proxies['dome'].isSlewing().__str__() + '; Tel:' + self.proxies['telescope'].isSlewing().__str__())
-            time.sleep(1)
-        self.log.debug('Telescope Slew Complete')
-        self.log.debug('Setting filterwheel to ' + exposure.filter.__str__())
-        self.proxies['filterwheel'].setFilter(exposure.filter)
-        while (self.proxies['filterwheel'].getFilter() != exposure.filter):
-            self.log.debug('Waiting for filterwheel to finish. Current: ' + self.proxies['filterwheel'].getFilter().__str__() + '; Wanted: ' + exposure.filter.__str__())
-            time.sleep(1)
-        self.log.debug('Exposing...' + self.proxies['camera'].__str__() + '::' + self.proxies['camera'].getDriver().__str__())
-        files = self.proxies['camera'].expose(exposure.duration,
-                frames=exposure.duration, interval=0.0,
-                shutter=exposure.shutterOpen,
-                binning=(exposure.binX, exposure.binY),
-                window=(exposure.windowXCtr, exposure.windowYCtr, exposure.windowWidth, exposure.windowHeight),
-                filename="$HOME/images/$date.fits")
+#        self.proxies['telescope']._transferThread()
+#        self.proxies['dome']._transferThread()
+#        self.proxies['camera']._transferThread()
+#        self.proxies['filterwheel']._transferThread()
+#        if exposure.observation==None:            
+#            raise ObjectNotFoundException('Unable to find associated observation')
+#        self.log.debug('Attempting to slew telescope to ' + exposure.observation.targetPos.__str__())
+#        self.proxies['telescope'].slewToRaDec(exposure.observation.targetPos)
+#        while (self.proxies['telescope'].isSlewing() | self.proxies['dome'].isSlewing()):
+#            self.log.debug('Waiting for slew to finish. Dome: ' + self.proxies['dome'].isSlewing().__str__() + '; Tel:' + self.proxies['telescope'].isSlewing().__str__())
+#            time.sleep(1)
+#        self.log.debug('Telescope Slew Complete')
+#        self.log.debug('Setting filterwheel to ' + exposure.filter.__str__())
+#        self.proxies['filterwheel'].setFilter(exposure.filter)
+#        while (self.proxies['filterwheel'].getFilter() != exposure.filter):
+#            self.log.debug('Waiting for filterwheel to finish. Current: ' + self.proxies['filterwheel'].getFilter().__str__() + '; Wanted: ' + exposure.filter.__str__())
+#            time.sleep(1)
+#        self.log.debug('Exposing...' + self.proxies['camera'].__str__() + '::' + self.proxies['camera'].getDriver().__str__())
+#        files = self.proxies['camera'].expose(exposure.duration,
+#                frames=exposure.duration, interval=0.0,
+#                shutter=exposure.shutterOpen,
+#                binning=(exposure.binX, exposure.binY),
+#                window=(exposure.windowXCtr, exposure.windowYCtr, exposure.windowWidth, exposure.windowHeight),
+#                filename="$HOME/images/$date.fits")
         #TODO: set headers on files in files
+        pass

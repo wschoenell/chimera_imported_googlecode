@@ -22,13 +22,13 @@
 from chimera.core.interface import Interface
 from chimera.core.event import event
 
-from chimera.interfaces.camera import Shutter, Binning, Window
-
 from chimera.util.enum import Enum
-
 
 Bitpix = Enum("char8", "uint16", "int16", "int32", "int64", "float32", "float64")
 
+# this makes sense for non-SBIG cameras?
+# how to handle multiple USB cameras? USB1, USBn...?
+# remove LPT support? (only works for SBIG on 2.4.x Linux kernel.
 Device = Enum ("USB",
                "USB1",
                "USB2",
@@ -36,29 +36,33 @@ Device = Enum ("USB",
                "LPT1",
                "LPT2")
 
+# keep this just as a way to force common names for the first two CCD?
+# (most cameras won't have more than 2 CCDs anyway).
 CCD = Enum ("IMAGING",
             "TRACKING")
 
+# Special features parameters can be passed as ImageRequest
+# parameters. The ICameraDriver.supports(feature) method can be used
+# to ask if the current camera support a given feature (useful for
+# interfaces, to decides when to display options to the user).
+
+CameraFeature = Enum("TEMPERATURE_CONTROL",
+                     "PROGRAMMABLE_GAIN",
+                     "PROGRAMMABLE_OVERSCAN",
+                     "PROGRAMMABLE_FAN",
+                     "PROGRAMMABLE_LEDS",
+                     "PROGRAMMABLE_BIAS_LEVEL")
 
 class ICameraDriver(Interface):
 
-    # config
-    __config__ = {"device"         : Device.USB,
-                  "ccd"          : CCD.IMAGING,
-                  
-                  "temp_setpoint"    : 20.0,
-                  "temp_delta"       : 1.0,
+    __config__ = {"device"            : Device.USB,
+                  "readout_aborted" : True,
+                  "temp_delta"      : 1.0}
 
-                  "camera_model"    : "Fake camera Inc.",
-                  "ccd_model"       : "KAF XYZ 10",
-                  "ccd_dimension_x" : 100,  # pixel
-                  "ccd_dimension_y" : 100,  # pixel
-                  "ccd_pixel_size_x": 10.0, # micrometer (without binning factors)
-                  "ccd_pixel_size_y": 10.0  # micrometer (without binning factors)
-                  }
-                  
-    # methods
-
+    #
+    # device handling
+    #
+    
     def open(self, device):
         pass
 
@@ -68,32 +72,29 @@ class ICameraDriver(Interface):
     def ping(self):
         pass
 
+    #
+    # exposure request and control
+    #
+
     def isExposing(self):
-        """
-        @return:   Return the currently exposing shepherd, or false
-        @rtype:    boolean or chimera.controllers.imageserver.shepherd.Shepherd
+        """Ask if camera is exposing right now.
+
+        @return: The currently exposing ImageRequest if the camera is exposing, False otherwise.
+        @rtype: bool or chimera.controllers.imageserver.imagerequest.ImageRequest
         """
         pass
 
-    def expose(self, shepherd):
+    def expose(self, request):
         pass
 
-    def getBinnings(self):
-        """Return the allowed binning settings for this camera
-        
-        @return: Dictionary with the keys being the English binning description (caption), and 
-                 the values being a device-specific value needed to activate the described binning
-        @rtype: dictionary
-        """
-        return {'1x1': 0}
-    
-    def getDeviceSize(self):
-        return (0,0)
-
-    def abortExposure(self, readout = False):
+    def abortExposure(self):
         pass
 
-    def startCooling(self):
+    #
+    # temperature control
+    #
+
+    def startCooling(self, setpoint):
         pass
 
     def stopCooling(self):
@@ -105,24 +106,64 @@ class ICameraDriver(Interface):
     def getTemperature(self):
         pass
 
-    def getSetpoint(self):
+    def getSetPoint(self):
         pass
 
+    #
+    # geometry and readout
+    #
+
+    # for getCCDs, getBinnings and getADCs, the driver should returns a
+    # list of Human readable strings, which could be later passed as a
+    # ImageRequest and be recognized by the driver. Those strings can
+    # be use as key to an internal hashmap.
+    # example:
+    # ADCs = {'12 bits': SomeInternalValueWhichMapsTo12BitsADC,
+    #         '16 bits': SomeInternalValueWhichMapsTo16BitsADC}
+
+    def getCCDs(self):
+        pass
+
+    def getBinnings(self):
+        pass
+
+    def getADCs(self):
+        pass
+
+    def getPhysicalSize(self, ccd=None):
+        pass
+
+    def getPixelSize(self, ccd=None):
+        pass
+
+    def getOverscanSize(self, ccd=None):
+        pass
+
+    #
+    # special features support
+    #
+    
+    def supports(self, feature=None):
+        pass
+
+    #
     # events
+    #
+    
     @event
-    def exposeBegin (self, exp_time):
+    def exposeBegin (self, request):
         pass
     
     @event
-    def exposeComplete (self):
+    def exposeComplete (self, request):
         pass
 
     @event
-    def readoutBegin (self, filename):
+    def readoutBegin (self, request):
         pass
 
     @event
-    def readoutComplete (self, filename):
+    def readoutComplete (self, request):
         pass
 
     @event

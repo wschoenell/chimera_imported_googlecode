@@ -28,6 +28,7 @@ from chimera.core.chimeraobject import ChimeraObject
 from chimera.interfaces.camerang import ICameraExpose, ICameraTemperature
 
 from chimera.controllers.imageserver.constants import SHUTTER_LEAVE
+from chimera.controllers.imageserver.imagerequest import ImageRequest
 
 from chimera.core.exceptions import OptionConversionException
 from chimera.core.exceptions import ChimeraValueError
@@ -103,14 +104,19 @@ class CameraNG (ChimeraObject, ICameraExpose, ICameraTemperature):
         self.temperatureChange(temp, delta)
 
     @lock
-    def expose (self, shepherd):
-        """
-        Unlike the old expose request, this one is for a single frame only so that 
-        reductions can start sooner.
+    def expose (self, *args, **kwargs):
         
-        @param shepherd: The imageserver shepherd
-        @type shepherd: chimera.controllers.imageserver.shepherd.Shepherd 
-        """
+        if len(args) > 0:
+            if isinstance(args[0], ImageRequest):
+                imageRequest = args[0]
+            else:
+                imageRequest = ImageRequest()
+                imageRequest += kwargs
+        
+        frames = imageRequest.frames
+        interval = imageRequest.interval
+        if frames == 1:
+            interval = 0.0
 
         # clear abort setting
         self.abort.clear()
@@ -118,12 +124,27 @@ class CameraNG (ChimeraObject, ICameraExpose, ICameraTemperature):
         # config driver
         drv = self.getDriver()
         
-        try:
-            drv.expose(shepherd)
-            return True
-        except:
-            return False
-            pass
+        imageURIs = []
+        for frame_num in range(frames):
+            
+            if self.abort.isSet():
+                return imageURIs
+            
+            try:
+                imageURI = drv.expose(imageRequest)
+                self.log.debug('Got back imageURI = ' + imageURI.__str__())
+                
+                if imageURI:
+                    
+                    imageURIs.append(imageURI)
+                
+                if interval > 0 and frame_num < frames:
+                    time.sleep(interval)
+            except ValueError:
+                raise ChimeraValueError('An error occurred while trying to take the exposure.')
+        
+        return tuple(imageURIs)
+                
         
     def abortExposure (self, readout=True):
         drv = self.getDriver()
@@ -161,3 +182,14 @@ class CameraNG (ChimeraObject, ICameraExpose, ICameraTemperature):
     def getSetpoint(self):
         drv = self.getDriver()
         return drv.getSetpoint()
+    
+    def getMetadata(self):
+        return [
+                ('INSTRUME', self['camera_model'], 'Camera Model'),
+                ('CCD',      self['ccd_model'], 'CCD Model'),
+                ('CCD_DIMX', self['ccd_dimension_x'], 'CCD X Dimension Size'),
+                ('CCD_DIMY', self['ccd_dimension_y'], 'CCD Y Dimension Size'),
+                ('CCDPXSZX', self['ccd_pixel_size_x'], 'CCD X Pixel Size [microns]'),
+                ('CCDPXSZY', self['ccd_pixel_size_y'], 'CCD Y Pixel Size [micrpns]'),
+                ]
+        

@@ -105,6 +105,9 @@ class ITelescopeDriverSlew (ITelescopeDriver):
 
     def getTargetAltAz(self):
         pass 
+    
+    def getFocalLength(self):
+        pass
 
     # events
     

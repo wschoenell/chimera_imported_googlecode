@@ -31,6 +31,7 @@ class Shepherd(ChimeraObject):
                    'interval':              0.0,
                    'shutter':               SHUTTER_LEAVE,
                    'binning':               ('None', None),                 #Based upon camera.getBinnings
+                                                # (('1x1', 3), ('2x2', 323))
                    'filter':                ('Clear', 'CLEAR'),             #Based upon filter.getFilters
                    'window':                ('Full', (0.5, 0.5, 1.0, 1.0)), #Ignored if hardware cannot handle
                    'chip':                  ('Default', None),              #Based upon camera.getChips
@@ -93,4 +94,16 @@ class Shepherd(ChimeraObject):
         
         for expNo in range(1,self['frames']):
             data = camera.expose(self)
+            
+        
+        self.getManager().getProxy(self['imageServerURI']).register(self)
     
+    def callForReduction(self):
+        
+        pass
+    
+    
+
+#camera.expose(a=a, b=b, c=c, ...)
+#
+#Image = camera.expose(ImageRequest(a=a, b=b, c=c, ...))

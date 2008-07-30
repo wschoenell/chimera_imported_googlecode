@@ -23,13 +23,16 @@ from chimera.core.interface import Interface
 from chimera.core.event import event
 #from chimera.util.enum  import Enum
 
-SHUTTER_OPEN    = True
-SHUTTER_CLOSE   = False
-SHUTTER_LEAVE   = None
+Shutter = Enum('OPEN', 'CLOSE', 'LEAVE_AS_IS')
 
-Shutter     = {'OPEN':  SHUTTER_OPEN,
-               'CLOSE': SHUTTER_CLOSE,
-               'LEAVE': SHUTTER_LEAVE}
+SHUTTER_OPEN    = Shutter.OPEN
+SHUTTER_CLOSE   = Shutter.CLOSE
+SHUTTER_LEAVE   = Shutter.LEAVE_AS_IS
+
+#Shutter     = {'OPEN':  SHUTTER_OPEN,
+#               'CLOSE': SHUTTER_CLOSE,
+#               'LEAVE': SHUTTER_LEAVE}
+
 
 #Shutter = Enum ("OPEN",
 #                "CLOSE",
@@ -42,6 +45,12 @@ class ICamera (Interface):
     # config
     __config__ = {"driver" : "/FakeCamera/0",
 
+                  "camera_model"    : "Fake camera Inc.",
+                  "ccd_model"       : "KAF XYZ 10",
+                  "ccd_dimension_x" : 100,  # pixel
+                  "ccd_dimension_y" : 100,  # pixel
+                  "ccd_pixel_size_x": 10.0, # micrometer (without binning factors)
+                  "ccd_pixel_size_y": 10.0  # micrometer (without binning factors)
                   }
 
 
@@ -49,15 +58,16 @@ class ICameraExpose (ICamera):
     """Basic camera that can expose and abort exposures.
     """
 
-    def expose (self, shepherd):
+    def expose (self, request=None, **kwargs):
         
-        """Start an exposure based upon the specified imageserver shepherd
+        """Start an exposure based upon the specified image request or will create
+        a new image request from kwargs
 
-        @param shepherd: ImageServer Shepherd
-        @type  shepherd: chimera.controllers.imageserver.shepherd.Shepherd
+        @param request: ImageRequest containing details of the image to be taken
+        @type  request: ImageRequest
                        
-        @return: True if exposure succeeds; False otherwise
-        @rtype: bool
+        @return: ImageURI if exposure succeeds; False otherwise
+        @rtype: bool or ImageURI
         """
 
     def abortExposure (self, readout=True):
@@ -74,8 +84,8 @@ class ICameraExpose (ICamera):
     def isExposing (self):
         """Ask if camera is exposing right now.
 
-        @return: The currently exposing shepherd if the camera is exposing, False otherwise.
-        @rtype: bool or chimera.controllers.imageserver.shepherd.Shepherd
+        @return: The currently exposing ImageRequest if the camera is exposing, False otherwise.
+        @rtype: bool or chimera.controllers.imageserver.imagerequest.ImageRequest
         """
     
     def getBinnings(self):
