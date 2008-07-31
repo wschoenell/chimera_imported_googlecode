@@ -11,7 +11,8 @@ class ImageServer(ChimeraObject):
     def __init__(self):
         ChimeraObject.__init__(self)
         
-        self.images = {}
+        self.imagesByID = {}
+        self.imagesByPath = {}
     
     def getFileName(self, filename='$DATE'):
         dest = os.path.expanduser(self['savedir'])
@@ -41,20 +42,59 @@ class ImageServer(ChimeraObject):
         return finalname
     
     def registerImage(self, image):
-        Manager().adapter.connect
-        #self.getManager().adapter.
-        self.images += {image.getHash(): image}
+        self.getDaemon().connect(image)
+        self.imagesByID += {image.getID(): image}
+        self.imagesByPath += {image.getPath(): image}
     
     def _isMyImage(self, imageURI):
         myMan = self.getManager()
         return ((imageURI.host == myMan.getHostname()) and (imageURI.port == myMan.getPort()))
     
-    def getImage(self, imageURI):
+    def getImageByURI(self, imageURI):
         if self._isMyImage(imageURI):
-            return self.images[imageURI.config['hash']]
+            return self.imagesByID[imageURI.config['hash']]
+    
+    def getImageByPath(self, path):
+        if path in self.imagesByPath.keys():
+            return self.imagesByPath[path]
+        else:
+            return None
+        
+    def __stop__(self):
+        for image in self.images.values():
+            self.getDaemon().disconnect(image)
 
     
-    pass
+    @staticmethod
+    def getImageServer():
+        #TODO: getting the current manager from "nothing"
+        manager = Manager.getManagerProxy()
+        try:
+            toReturn = manager.getProxy('/ImageServer/0')
+        except NameError:
+            toReturn = manager.addLocation('/ImageServer/imageserver', ChimeraPath.controllers())
+        if not toReturn:
+            raise ClassLoaderException('Unable to create or find an ImageServer')
+        
 
 
+
+
+#If you create new Pyro objects on the server, and you want them to be accessed from the client, or vice versa (such as callback objects), you have to consider some things carefully. Make sure you:
+#
+#    * derive the class from Pyro.core.ObjBase, or use the delegation approach, and call Pyro.core.ObjBase.__init__(self) from your own __init__
+#    * connect the new object to the Pyro Daemon (with or without a name). (This is needed to register the object as a Pyro object, and to set the daemon in the object for the next step.) It can be easily done from within the Pyro object that created the new object:
+#
+#         URI = self.getDaemon().connect(object)        # no name, not in NS
+#         URI = self.getDaemon().connect(object,'name') # registered in NS with 'name'
+#
+#    * return a proxy for the object, not the object itself. Instead of the normal return object that you would otherwise use, you do:
+#
+#         return object.getProxy()      # regular dynamic proxy
+#         return object.getAttrProxy()  # dynamic proxy with attribute support
+#
+#    * disconnect the object form the Pyro Daemon if you're done with it (don't just del it)
+#
+#         self.getDaemon().disconnect(object)
+#         del object
 

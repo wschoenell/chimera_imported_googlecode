@@ -28,6 +28,7 @@ from chimera.interfaces.telescopedriver import SlewRate
 from chimera.core.lock import lock
 
 from chimera.util.position import Position
+import datetime
 
 
 __all__ = ["Telescope"]
@@ -252,3 +253,19 @@ class Telescope(ChimeraObject,
         drv = self.getDriver()
         return drv.isTracking()
         
+    def getMetadata(self):
+        return [
+                ('TELESCOP', self['model'], 'Telescope Model'),
+                ('OPTICS',   self['optics'], 'Telescope Optics Type'),
+                ('MOUNT', self['mount'], 'Telescope Mount Type'),
+                ('APERTURE', self['aperture'], 'Telescope aperture size [mm]'),
+                ('F_LENGTH', self['focal_length'], 'Telescope focal length [mm]'),
+                ('F_REDUCT', self['focal_reduction'], 'Telescope focal reduction'),
+                #TODO: Convert coordinates to proper equinox
+                #TODO: How to get ra,dec at start of exposure (not end)
+                #("EQUINOX", 2000.0, "equinox of celestial coordinate system"),
+                ('RA', self.getRA().toHMS().__str__(), 'Right ascension of the observed object'),
+                ('DEC', self.getDec().toDMS().__str__(), 'Declination of the observed object'),
+                ('ALT', self.getAlt().toDMS().__str__(), 'Altitude of the observed object'),
+                ('AZ', self.getAz().toDMS().__str__(),'Azimuth of the observed object')
+                ] + self.getDriver().getMetadata()

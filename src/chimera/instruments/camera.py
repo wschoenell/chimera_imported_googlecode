@@ -191,5 +191,4 @@ class CameraNG (ChimeraObject, ICameraExpose, ICameraTemperature):
                 ('CCD_DIMY', self['ccd_dimension_y'], 'CCD Y Dimension Size'),
                 ('CCDPXSZX', self['ccd_pixel_size_x'], 'CCD X Pixel Size [microns]'),
                 ('CCDPXSZY', self['ccd_pixel_size_y'], 'CCD Y Pixel Size [micrpns]'),
-                ]
-        
+                ] + self.getDriver().getMetadata()

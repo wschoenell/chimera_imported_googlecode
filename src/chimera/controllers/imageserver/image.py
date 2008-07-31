@@ -4,65 +4,76 @@ from chimera.core.path import ChimeraPath
 from chimera.interfaces.cameradriver import Bitpix
 from chimera.controllers.imageserver.imageuri import ImageURI
 from chimera.core.exceptions import ClassLoaderException
+import Pyro.util.getGUID
+from chimera.controllers.imageserver.imageserver import ImageServer
 
 fits_date_format = "%Y-%m-%dT%H:%M:%S"
 
 import pyfits
 import numpy
-#TODO: Python2.4 Compatible hashlib
-try:
-    import hashlib
-    def hashFcn(filename):
-        file = open(filename, 'rb')
-        hash = hashlib.sha1(file.read()).hexdigest()
-        file.close()
-        return hash
-except:
-    import sha
-    def hashFcn(filename):
-        file = open(filename, 'rb')
-        hash = sha.new(file.read()).hexdigest()
-        file.close()
-        return hash
+import os.path
 
-class ImageURI(object):
-    def __init__(self):
-        object.__init__(self)
-        
+##TODO: Python2.4 Compatible hashlib
+#try:
+#    import hashlib
+#    def hashFcn(filename):
+#        file = open(filename, 'rb')
+#        hash = hashlib.sha1(file.read()).hexdigest()
+#        file.close()
+#        return hash
+#except:
+#    import sha
+#    def hashFcn(filename):
+#        file = open(filename, 'rb')
+#        hash = sha.new(file.read()).hexdigest()
+#        file.close()
+#        return hash
+
 
 class Image(ChimeraObject):
     
-    def __init__(self):
+    def __init__(self, fileName = None):
         ChimeraObject.__init__(self)
         
-        self.imageServer = None
+        self.imageServer = ImageServer.getImageServer()
         
-        try:
-            self.imageServer = self.getManager().getProxy('/ImageServer/0')
-        except NameError:
-            self.imageServer = self.getManager().addLocation('/ImageServer/imageserver', ChimeraPath.controllers())
-            if not self.imageServer:
-                raise ClassLoaderException('Unable to create an ImageServer')
-            
-        self.path = None
-        self.hdu = None
-        self.hash = None
-        pass
-    
-    def _registerMe(self):
+        if fileName == None:
+            self.path = None
+            self.header = None
+            self.hash = None
+            self.myGUID = Pyro.util.getGUID()
+        else:
+            self.path = os.path.expanduser(fileName)
+            self.path = os.path.expandvars(self.path)
+            self.path = os.path.realpath(self.path)
+            self.header = pyfits.getheader(fileName)
+            self.myGUID = self.header['CHM_IMID']
         self.imageServer.registerImage(self)
-    
-    def getHash(self):
-        if self.hash == None:
-            self.hash = hashFcn(self.path) 
-        return self.hash
+        pass
+        
+    def getID(self):
+        return self.myGUID
+#        if self.hash == None:
+##            self.hash = hashFcn(self.path)
+#            self.hash =  getGUID()
+#        return self.hash
+
+    def getPath(self):
+        return self.path
     
     def getURI(self):
         return ImageURI(self.imageServer, self.getHash)
-        
+    
+    @staticmethod
+    def imageFromFile(fileName):
+        toReturn = ImageServer.getImageServer().getImageByPath(fileName)
+        if not toReturn:
+            toReturn = Image(fileName)
+        return toReturn
+            
     @staticmethod
     def imageFromImg(img, imageRequest, dict = None):
-        image = imageStart(imageRequest)
+        image = Image()
         
         hdu = pyfits.PrimaryHDU(img)
         
@@ -77,9 +88,13 @@ class Image(ChimeraObject):
                          #("MJD-OBS", 0.0, "date of the start of observation in MJD"),      #Not needed
                          #("RA", "00:00:00", "right ascension of the observed object"),     #From telescope
                          #("DEC", "00:00:00", "declination of the observed object"),        #From telescope
-                         ("EQUINOX", 2000.0, "equinox of celestial coordinate system"),
-                         ("RADESYS", "FK5",  "reference frame"),
-                         ("SECPIX", 0.0, "plate scale"),                                   #From telescope
+                         
+                         #TODO: Convert to current equinox
+                         #("EQUINOX", 2000.0, "equinox of celestial coordinate system"),
+                         #("RADESYS", "FK5",  "reference frame"),
+                         
+                         #("SECPIX", 0.0, "plate scale"),                                   #Added after all other stuff is in
+                         
                          ("WCSAXES", 2, "wcs dimensionality"),
                          ("CRPIX1", 0.0, "coordinate system reference pixel"),
                          ("CRPIX2", 0.0, "coordinate system reference pixel"),
@@ -97,7 +112,8 @@ class Image(ChimeraObject):
                          #('OBJECT', 'UNKNOWN', 'Object observed'),                        #Added by scheduler
                          #('TELESCOP', 'UNKNOWN', 'Telescope used for observation'),        #Added by telescope
                          #('PI', 'Chimera User', 'Principal Investigator'),                #Added by scheduler
-                         ('IMAGETYP', imageRequest['image_type'], 'Image type')
+                         ('IMAGETYP', imageRequest['image_type'], 'Image type'),
+                         ('CHM_IMID',image.getID(), 'Chimera Internal Image ID')
                          ]
 
         #TODO: Implement bitpix support
@@ -117,7 +133,6 @@ class Image(ChimeraObject):
         del hdu
         del hduList
         
-        image._registerMe()
         return image.getURI()
     
     @staticmethod
