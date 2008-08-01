@@ -25,7 +25,7 @@ if __name__ == '__main__':
                  Exposure(shutterOpen = False, frames=20, duration=60, binX=1, binY=1, imageType='dark'),
                  ]
     
-    obs = Observation(caption = 'Calibration', targetName='Calibration', targetPos=Position.fromRaDec('0:0:0', '-90:0:0'), exposures=exposures)
+    obs = Observation(caption = 'Calibration', targetName='Calibration', targetPos=Position.fromRaDec('0:0:1', '-89:59:59'), exposures=exposures)
     
     p = Program(pi='Isaac Richter', observations=[obs], caption='Calibration')
     session.flush()
@@ -42,15 +42,3 @@ if __name__ == '__main__':
     
     p = Program(pi='Antonio Kanaan', observations=[obs])    
     session.flush()
-# 
-#    exposure = Science(exptime=3, frames=2, interval=0, filter_="I")
-#
-#    c1 = MoonDistance(name="moon-distance", min=10, max=20)
-#    c2 = MoonPhase(name="moon-phase", min=40, max=60)
-#
-#    obs = Observation(target=target, exposures=[exposure], constraints=[c1])
-#
-#    p = Program(pi='Paulo Henrique', constraints=[c2], observations=[obs])
-#    q = Program(pi='Observer Tester')
-#
-#    session.flush()

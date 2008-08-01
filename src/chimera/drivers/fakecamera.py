@@ -88,7 +88,7 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
         return self.__exposing
 
     @lock
-    def expose(self):
+    def expose(self, imageRequest):
 #        self.__exposing = True
 #        self.__abort.clear()
 #
@@ -288,7 +288,7 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
         imageRequest.addPostHeaders(self.getManager())
         
         Image.imageFromImg(pix, imageRequest, [
-                                               ('DATE-OBS',Image.formatDate(self.lastFrameStartTime),'Date exposure started'),
+                                               ('DATE-OBS',Image.formatDate(self.__lastFrameStart),'Date exposure started'),
                                                ('XBINNING',1,'Readout CCD Binning (x-axis)'),
                                                ('YBINNING',1,'Readout CCD Binning (y-axis)'),
                                                ('XWIN_LFT',0,'Readout window x left position'),

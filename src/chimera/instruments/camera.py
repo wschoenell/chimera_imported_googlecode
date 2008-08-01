@@ -25,9 +25,8 @@ import time
 
 
 from chimera.core.chimeraobject import ChimeraObject
-from chimera.interfaces.camerang import ICameraExpose, ICameraTemperature
+from chimera.interfaces.camera import ICameraExpose, ICameraTemperature, SHUTTER_LEAVE
 
-from chimera.controllers.imageserver.constants import SHUTTER_LEAVE
 from chimera.controllers.imageserver.imagerequest import ImageRequest
 
 from chimera.core.exceptions import OptionConversionException
@@ -37,7 +36,7 @@ from chimera.core.exceptions import ChimeraException
 from chimera.core.lock import lock
 
 
-class CameraNG (ChimeraObject, ICameraExpose, ICameraTemperature):
+class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
 
     def __init__(self):
         ChimeraObject.__init__(self)
@@ -110,11 +109,13 @@ class CameraNG (ChimeraObject, ICameraExpose, ICameraTemperature):
             if isinstance(args[0], ImageRequest):
                 imageRequest = args[0]
             else:
-                imageRequest = ImageRequest()
+                imageRequest = ImageRequest(kwargs)
                 imageRequest += kwargs
+        else:
+            imageRequest = ImageRequest()
         
-        frames = imageRequest.frames
-        interval = imageRequest.interval
+        frames = imageRequest['frames']
+        interval = imageRequest['interval']
         if frames == 1:
             interval = 0.0
 

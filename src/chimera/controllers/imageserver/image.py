@@ -4,7 +4,7 @@ from chimera.core.path import ChimeraPath
 from chimera.interfaces.cameradriver import Bitpix
 from chimera.controllers.imageserver.imageuri import ImageURI
 from chimera.core.exceptions import ClassLoaderException
-import Pyro.util.getGUID
+import Pyro.util
 from chimera.controllers.imageserver.imageserver import ImageServer
 
 fits_date_format = "%Y-%m-%dT%H:%M:%S"
@@ -12,6 +12,7 @@ fits_date_format = "%Y-%m-%dT%H:%M:%S"
 import pyfits
 import numpy
 import os.path
+import time
 
 ##TODO: Python2.4 Compatible hashlib
 #try:

@@ -62,7 +62,7 @@ __all__ = ['Manager']
 
 log = logging.getLogger(__name__)
 
-firstManagerURI = None
+firstManagerURI = False
 
 class ManagerAdapter (Pyro.core.Daemon):
 
@@ -146,14 +146,18 @@ class Manager (RemoteObject):
         # shutdown event
         self.died = threading.Event()
         
-        if firstManagerURI == None:
+        global firstManagerURI
+        
+        if not firstManagerURI:
             firstManagerURI = Pyro.core.PyroURI(host=self.getHostname(),
                                                 port=self.getPort(),
                                                 objectID=MANAGER_LOCATION)
     
     @staticmethod
     def getManagerProxy():
-        if firstManagerURI == None:
+        global firstManagerURI
+        
+        if not firstManagerURI:
             raise ChimeraObjectException('Unable to find running manager')
         return Proxy(uri = firstManagerURI)
 

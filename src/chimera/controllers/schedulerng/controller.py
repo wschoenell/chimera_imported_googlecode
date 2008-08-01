@@ -5,7 +5,7 @@ from chimera.controllers.schedulerng.machine import Machine
 from chimera.controllers.schedulerng.sequential import SequentialScheduler
 from chimera.controllers.schedulerng.states import State
 
-from chimera.interfaces.camera  import Binning, Window, SHUTTER_OPEN, SHUTTER_CLOSE
+from chimera.interfaces.camera  import SHUTTER_OPEN, SHUTTER_CLOSE#, Binning, Window 
 
 from chimera.controllers.imageserver.imagerequest import ImageRequest
 
@@ -13,6 +13,7 @@ import chimera.core.log
 import logging
 import threading
 from elixir import session
+import time
 
 class Controller(ChimeraObject):
     __config__ = {"telescope"   : "/Telescope/0",
@@ -24,12 +25,14 @@ class Controller(ChimeraObject):
 
     def __init__(self):
         ChimeraObject.__init__(self)
-        mgr = self.getManager()
-        self.hostPort = mgr.getHostname() + ':' + mgr.getPort()
         self.machine = Machine(SequentialScheduler(), self)
         self.proxies = {}
+        self.hostPort=''
 
     def __start__(self):
+        mgr = self.getManager()
+        self.hostPort = mgr.getHostname() + ':' + str(mgr.getPort())
+
         # try to get proxies
         try:
             #FIXME: Proxies should be gotten in machine thread; not here! and preferably before each obs.
@@ -116,6 +119,8 @@ class Controller(ChimeraObject):
                                          self.hostPort+self['site'],
                                          ]
                           )
+        
+        camera.expose(ir)
 #        self.proxies['telescope']._transferThread()
 #        self.proxies['dome']._transferThread()
 #        self.proxies['camera']._transferThread()

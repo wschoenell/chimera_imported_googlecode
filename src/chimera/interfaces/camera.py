@@ -21,7 +21,7 @@
 
 from chimera.core.interface import Interface
 from chimera.core.event import event
-#from chimera.util.enum  import Enum
+from chimera.util.enum  import Enum
 
 Shutter = Enum('OPEN', 'CLOSE', 'LEAVE_AS_IS')
 

@@ -12,7 +12,7 @@ import logging
 import time
 
 from chimera.core.exceptions import ObjectNotFoundException
-from chimera.interfaces.camera  import Shutter, Binning, Window
+from chimera.interfaces.camera  import Shutter #, Binning, Window
 
 class Constraint(Entity):
     using_options(tablename='constraints')
