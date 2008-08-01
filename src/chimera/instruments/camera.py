@@ -126,6 +126,7 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
         drv = self.getDriver()
         
         imageURIs = []
+        self.log.debug('Looping through ' + str(frames) + ' frames...')
         for frame_num in range(frames):
             
             if self.abort.isSet():

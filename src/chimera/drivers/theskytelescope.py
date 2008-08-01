@@ -152,12 +152,12 @@ class TheSkyTelescope (ChimeraObject, ITelescopeDriverSlew):
 
     @com
     def getAz (self):
-        self._telescope.GetAltAz()
+        self._telescope.GetAzAlt()
         return Coord.fromDMS(self._telescope.dAz)
 
     @com
     def getAlt (self):
-        self._telescope.GetAltAz()
+        self._telescope.GetAzAlt()
         return Coord.fromDMS(self._telescope.dAlt)
 
     @com

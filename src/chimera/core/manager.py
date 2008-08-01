@@ -34,7 +34,8 @@ from chimera.core.exceptions   import InvalidLocationException, \
                                       NotValidChimeraObjectException, \
                                       ChimeraObjectException, \
                                       ClassLoaderException, \
-                                      ChimeraException
+                                      ChimeraException, \
+                                      OptionConversionException
 
 
 import chimera.core.log

@@ -83,6 +83,12 @@ if __name__ == '__main__':
                       " format: [host:port]/Class/name.",
                       callback=check_location)
 
+    config.add_option("-W", "--wheel", action="callback", type="string", dest="fwheel",
+                      help="Camera instrument to be used. If blank, create a new"
+                      " camera instance, using the the driver selected with --driver."
+                      " format: [host:port]/Class/name.",
+                      callback=check_location)
+
     config.add_option("-d", "--driver", action="callback", type="string", dest="driver",
                       help="Camera driver to be used."
                       " /Class/name?option1=value1,option2=value. [default=%default]",

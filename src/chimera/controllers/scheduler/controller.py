@@ -83,14 +83,15 @@ class Controller(ChimeraObject):
         
         self.log.debug('Attempting to slew telescope to ' + observation.targetPos.__str__())
         telescope.slewToRaDec(observation.targetPos)
-        self.log.debug('Setting filter...')
-        filterwheel.setFilter(exposure.filter)
+        self.log.debug('Setting filter to ' + str(exposure.filter) + '...')
+        filterwheel.setFilter(str(exposure.filter))
         while (telescope.isSlewing() | dome.isSlewing()):
             self.log.debug('Waiting for slew to finish. Dome: ' + dome.isSlewing().__str__() + '; Tel:' + telescope.isSlewing().__str__())
             time.sleep(1)
         self.log.debug('Telescope Slew Complete')
-        while (filterwheel.getFilter() != exposure.filter):
+        while (str(filterwheel.getFilter()) != str(exposure.filter)):
             self.log.debug('Waiting for filterwheel to finish. Current: ' + filterwheel.getFilter().__str__() + '; Wanted: ' + exposure.filter.__str__())
+            filterwheel.setFilter(str(exposure.filter))
             time.sleep(1)
         self.log.debug('Filter set')
         
@@ -102,8 +103,9 @@ class Controller(ChimeraObject):
             shutter=('Closed', SHUTTER_CLOSE)
         
         ir = ImageRequest(
-                          duration = exposure.duration,
+                          exp_time = exposure.duration,
                           shutter=shutter,
+                          frames = exposure.frames,
                           headers = [
                                      ('OBJECT', str(observation.targetName), 'Object name'),
                                      ('TRGT_RA', observation.targetPos.ra.__str__(), 'Target RA'),

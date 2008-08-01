@@ -11,21 +11,21 @@ if __name__ == '__main__':
 #    target = Target(name='NGC 4755', position=Position.fromRaDec(10, 10))
     
     exposures = [
-                 Exposure(shutterOpen = True, frames=20, duration=1, binX=1, binY=1, imageType='flat'),
-                 Exposure(shutterOpen = True, frames=20, duration=2, binX=1, binY=1, imageType='flat'),
-                 Exposure(shutterOpen = True, frames=20, duration=3, binX=1, binY=1, imageType='flat'),
+                 Exposure(shutterOpen = True, filter='CLEAR', frames=20, duration=1, binX=1, binY=1, imageType='flat'),
+                 Exposure(shutterOpen = True, filter='CLEAR', frames=20, duration=2, binX=1, binY=1, imageType='flat'),
+                 Exposure(shutterOpen = True, filter='CLEAR', frames=20, duration=3, binX=1, binY=1, imageType='flat'),
 
-                 Exposure(shutterOpen = False, frames=20, duration=0, binX=1, binY=1, imageType='zero'),
+                 Exposure(shutterOpen = False, filter='CLEAR', frames=20, duration=0, binX=1, binY=1, imageType='zero'),
                  
-                 Exposure(shutterOpen = False, frames=20, duration=5, binX=1, binY=1, imageType='dark'),
-                 Exposure(shutterOpen = False, frames=20, duration=10, binX=1, binY=1, imageType='dark'),
-                 Exposure(shutterOpen = False, frames=20, duration=15, binX=1, binY=1, imageType='dark'),
-                 Exposure(shutterOpen = False, frames=20, duration=20, binX=1, binY=1, imageType='dark'),
-                 Exposure(shutterOpen = False, frames=20, duration=30, binX=1, binY=1, imageType='dark'),
-                 Exposure(shutterOpen = False, frames=20, duration=60, binX=1, binY=1, imageType='dark'),
+                 Exposure(shutterOpen = False, filter='CLEAR', frames=20, duration=5, binX=1, binY=1, imageType='dark'),
+                 Exposure(shutterOpen = False, filter='CLEAR', frames=20, duration=10, binX=1, binY=1, imageType='dark'),
+                 Exposure(shutterOpen = False, filter='CLEAR', frames=20, duration=15, binX=1, binY=1, imageType='dark'),
+                 Exposure(shutterOpen = False, filter='CLEAR', frames=20, duration=20, binX=1, binY=1, imageType='dark'),
+                 Exposure(shutterOpen = False, filter='CLEAR', frames=20, duration=30, binX=1, binY=1, imageType='dark'),
+                 Exposure(shutterOpen = False, filter='CLEAR', frames=20, duration=60, binX=1, binY=1, imageType='dark'),
                  ]
     
-    obs = Observation(caption = 'Calibration', targetName='Calibration', targetPos=Position.fromRaDec('0:0:1', '-89:59:59'), exposures=exposures)
+    obs = Observation(caption = 'Calibration', targetName='Calibration', targetPos=Position.fromRaDec('21:34:05.49', '-84:46:12.83'), exposures=exposures)
     
     p = Program(pi='Isaac Richter', observations=[obs], caption='Calibration')
     session.flush()
