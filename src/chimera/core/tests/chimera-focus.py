@@ -21,6 +21,8 @@
 
 from chimera.core.cli import ChimeraCLI, action
 
+import sys
+    
 
 class ChimeraFocus (ChimeraCLI):
     
@@ -64,12 +66,11 @@ class ChimeraFocus (ChimeraCLI):
 
     def _currentPosition(self, options):
         return self.out("Current focuser position: %s\n" % options.focuser.getPosition())
+    
 
-if __name__ == '__main__':
-    
-    import sys
-    
+def main():
     cli = ChimeraFocus()
-    ret = cli.run(sys.argv)
-    sys.exit(ret)
+    return cli.run(sys.argv)
     
+if __name__ == '__main__':
+    main()

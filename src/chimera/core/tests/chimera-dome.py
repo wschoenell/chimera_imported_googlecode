@@ -22,6 +22,8 @@
 from chimera.core.cli import ChimeraCLI, action
 from chimera.util.coord import Coord
 
+import sys
+
 
 class ChimeraDome (ChimeraCLI):
     
@@ -34,7 +36,7 @@ class ChimeraDome (ChimeraCLI):
         self.addDriver(instrument="dome", name="driver", short="d", help="Dome driver to be used", helpGroup="DOME")
 
         self.addHelpGroup("TELESCOPE", "Telescope Tracking Configuration")
-        self.addParameters(dict(name="telescope", helpGroup="TELESCOPE",
+        self.addParameters(dict(name="telescope", default="/Telescope/0", helpGroup="TELESCOPE",
                                 help="Tell the dome to follow TELESCOPE when tracking (only "
                                 "utilized when calling --track"))
         
@@ -59,11 +61,11 @@ class ChimeraDome (ChimeraCLI):
 
     @action(help="Track the telescope", helpGroup="COMMANDS", actionGroup="TRACKING")
     def track(self, options):
-        self.out("Activating tracking ... ")
 
         if options.telescope:
             options.dome["telescope"] = options.telescope
             
+        self.out("Activating tracking ... ")
         options.dome.track()
         self.out("OK\n")
 
@@ -96,11 +98,9 @@ class ChimeraDome (ChimeraCLI):
         else:
             self.out("Dome slit is closed.\n")
 
-if __name__ == '__main__':
-    
-    import sys
-    
+def main():
     cli = ChimeraDome()
-    ret = cli.run(sys.argv)
-    sys.exit(ret)
-
+    return cli.run(sys.argv)
+    
+if __name__ == '__main__':
+    main()
