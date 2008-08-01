@@ -62,9 +62,11 @@ class FakeTelescope (ChimeraObject,
 
     @lock
     def control (self):
-        self._ra  += Coord.fromAS(15)
-        self._az  += Coord.fromAS(5*60)
-        self._alt += Coord.fromAS(15)
+        if self._tracking:
+            self._ra  += Coord.fromAS(15)
+            #self._az  += Coord.fromAS(5*60)
+            #self._alt += Coord.fromAS(15)
+        
         return True
 
     def open(self):
@@ -99,8 +101,8 @@ class FakeTelescope (ChimeraObject,
 
             self._ra  += ra_steps
             self._dec += dec_steps
-            self._az  += ra_steps
-            self._alt += dec_steps
+            #self._az  += ra_steps
+            #self._alt += dec_steps
             
             time.sleep(0.5)
             t += 0.5
@@ -170,9 +172,17 @@ class FakeTelescope (ChimeraObject,
         return Position.fromRaDec(self.getAlt(), self.getAz())
 
     @lock
-    def sync(self, position):
-        self._ra  = position.ra
+    def syncObject (self, name):
+        pass
+    
+    @lock
+    def syncRaDec (self, position):
+        self._ra = position.ra
         self._dec = position.dec
+
+    @lock
+    def syncAltAz (self, position):
+        pass
 
     @lock
     def park(self):

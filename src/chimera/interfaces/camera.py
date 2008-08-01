@@ -213,7 +213,7 @@ class ICameraTemperature (ICamera):
         @rtype: float
         """
 
-    def getSetpoint(self):
+    def getSetPoint(self):
         """Get the current camera temperature setpoint.
 
         @return: The current camera temperature setpoint in degrees Celsius.

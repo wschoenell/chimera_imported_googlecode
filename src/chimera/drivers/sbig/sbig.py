@@ -168,7 +168,7 @@ class SBIG(ChimeraObject, ICameraDriver, IFilterWheelDriver):
         return self.drv.getTemperature()[-1]
 
     @lock
-    def getSetpoint(self):
+    def getSetPoint(self):
         return self.drv.getTemperature()[-2]
 
     @lock

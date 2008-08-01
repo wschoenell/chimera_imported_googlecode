@@ -12,6 +12,8 @@ from chimera.util.enum      import Enum
 import sys
 import optparse
 import os.path
+import signal
+import threading
 
 __all__ = ['ChimeraCLI',
            'Action',
@@ -19,7 +21,7 @@ __all__ = ['ChimeraCLI',
            'action',
            'parameter']
 
-ParameterType = Enum("INSTRUMENT", "DRIVER", "CONTROLLER", "BOOLEAN", "INCLUDE_PATH")
+ParameterType = Enum("INSTRUMENT", "DRIVER", "CONTROLLER", "BOOLEAN", "CHOICE", "INCLUDE_PATH")
 
 class Option (object):
     name  = None
@@ -29,6 +31,8 @@ class Option (object):
 
     type  = None
     default = None
+    
+    choices = None
 
     actionGroup = None
 
@@ -39,6 +43,8 @@ class Option (object):
     target = None
     cls = None
     instrument = None
+    # if ParameterType.INSTRUMENT: is this instrument required?
+    required = False
 
     def __init__ (self, **kw):
 
@@ -265,7 +271,7 @@ class ChimeraCLI (object):
     run. After the action be runned, __stop__ would be called.
 
     """
-
+            
     def __init__ (self, prog, description, version,
                   host=None, port=None,
                   verbosity=True, sysconfig=True,
@@ -280,8 +286,12 @@ class ChimeraCLI (object):
         self._actions = {}
         self._parameters = {}
         
-        self._actionGroups = {}
         self._helpGroups = {}
+        
+        self._aborting = False
+
+        signal.signal(signal.SIGTERM, self._sighandler)
+        signal.signal(signal.SIGINT, self._sighandler)
 
         # base actions and parameters
 
@@ -315,18 +325,31 @@ class ChimeraCLI (object):
         self._needInstrumentsPath = instrument_path
         self._needControllersPath = controllers_path
 
-    def out(self, msg):
-        sys.stdout.write(msg)
-        sys.stdout.flush()
+    def _print(self, *args, **kwargs):
+        sep = kwargs.pop("sep", " ")
+        end = kwargs.pop("end", "\n")
+        stream = kwargs.pop("file", sys.stdout)
+        
+        for arg in args:
+            stream.write(arg)
+            stream.write(sep)
 
-    def err(self, msg):
-        sys.stderr.write(msg)
-        sys.stderr.flush()
+        stream.write(end)
+        stream.flush()
+        
+    def out(self, *args, **kwargs):
+        self._print(*args, **kwargs)
 
+    def err(self, *args, **kwargs):
+        kwargs["file"] = sys.stderr
+        self._print(*args, **kwargs)
+        
     def exit(self, msg=None, ret=1):
         self.__stop__(self.options)
+
         if msg:
             self.err(msg)
+            
         sys.exit(ret)
 
     def addParameters(self, *params):
@@ -338,9 +361,6 @@ class ChimeraCLI (object):
         for action in actions:
             act = Action(**action)
             self._actions[act.name] = act
-
-    def addActionGroup(self, name):
-        self._actionGroups[name] = []
 
     def addHelpGroup(self, name, shortdesc, longdesc=None):
         self._helpGroups[name] = optparse.OptionGroup(self.parser, shortdesc, longdesc)
@@ -406,7 +426,7 @@ class ChimeraCLI (object):
         actions = self._getActions(self.options)
 
         if not actions:
-            self.exit("Please select one action or --help for more information.\n")
+            self.exit("Please select one action or --help for more information.")
             
         # for each defined parameter, run validation code
         self._validateParameters(self.options)
@@ -461,7 +481,7 @@ class ChimeraCLI (object):
         drivers     = dict([(x.name, x) for x in self._parameters.values() if x.type == ParameterType.DRIVER])
         instruments = dict([(x.name, x) for x in self._parameters.values() if x.type == ParameterType.INSTRUMENT])
         controllers = dict([(x.name, x) for x in self._parameters.values() if x.type == ParameterType.CONTROLLER])
-
+        
         # process inst/driver pairs
         for inst in instruments.values():
 
@@ -474,10 +494,12 @@ class ChimeraCLI (object):
             drv_proxy = None
 
             drv = [d for d in drivers.values() if d.instrument == inst.name]
-            # uses only the first driver (if more found)
-            if drv: drv = drv[0]
-            assert drv != None, "Parser error. Instrument without a driver!"
+            assert len(drv) > 0, "Parser error. Instrument without a driver!"
 
+            # uses only the first driver (if more found)
+            if len(drv) >= 1:
+                drv = drv[0]
+                 
             if inst.default != getattr(options, inst.name):
                 inst_loc = Location(getattr(options, inst.name))
 
@@ -486,11 +508,12 @@ class ChimeraCLI (object):
 
             if not inst_loc:
                 if self.sysconfig:
-                    inst_loc = [i for i in self.sysconfig.instruments if i.cls == inst.cls]
+                    # FIXME: lower names
+                    inst_loc = [i for i in self.sysconfig.instruments if i.cls.lower() == inst.cls.lower()]
                     if inst_loc: inst_loc = inst_loc[0]
                 else:
                     self.exit("Couldn't found %s configuration."
-                              "Edit chimera.config or see --help for more information\n" % inst.name.capitalize())
+                              "Edit chimera.config or see --help for more information" % inst.name.capitalize())
 
             if drv_loc:
 
@@ -505,7 +528,7 @@ class ChimeraCLI (object):
                                                                   path=ChimeraPath.drivers())
                         new_local_driver = True
                     else:
-                        self.exit("Couldn't found driver %s.\n" % drv_loc)
+                        self.exit("Couldn't found driver %s." % drv_loc)
 
             if inst_loc:
 
@@ -521,7 +544,7 @@ class ChimeraCLI (object):
                         if not inst_proxy["driver"] == drv_proxy.getLocation():
                             if not new_local_driver:
                                 self.exit("Couldn't change %s driver to %s. "
-                                          "The %s is already running.\n" % (inst_loc, drv_loc,
+                                          "The %s is already running." % (inst_loc, drv_loc,
                                                                             inst.name.capitalize()))
                             else:
                                 # force local instrument
@@ -537,17 +560,18 @@ class ChimeraCLI (object):
                         inst_proxy = self.localManager.addLocation(inst_loc, start=True,
                                                                    path=ChimeraPath.instruments())
                     else:
-                        self.exit("Couldn't found %s (%s).\n" % (inst.name.capitalize(), inst_loc))
+                        self.exit("Couldn't found %s (%s)." % (inst.name.capitalize(), inst_loc))
 
 
+            #print inst.name, inst.cls
             #print "inst location:", inst_loc, "drv location:", drv_loc
             #print "inst proxy   :", inst_proxy, "drv proxy:", drv_proxy
             #print
 
-            if not inst_proxy and not drv_proxy:
+            if not inst_proxy and not drv_proxy and inst.required == True:
                 self.exit("Couldn't found %s configuration, Edit %s or "
-                          "pass instrument/driver parameters (see --help)\n" % (inst.name.capitalize(),
-                                                                                options.sysconfig))
+                          "pass instrument/driver parameters (see --help)" % (inst.name.capitalize(),
+                                                                              options.sysconfig))
 
             # save values in options
             if inst_proxy:
@@ -584,8 +608,8 @@ class ChimeraCLI (object):
 
         for action in self._actions.values():
             
-            if action.actionGroup and action.actionGroup not in self._actionGroups:
-                raise TypeError("Invalid action group %s. Use addActionGroup first." % action.actionGroup)
+            if not action.actionGroup:
+                action.actionGroup = action.name
 
             if action.type:
                 kind = "store"
@@ -612,6 +636,7 @@ class ChimeraCLI (object):
 
             option_action = "store"
             option_callback = None
+            option_choices = None
             option_type = param.type or None
 
             if param.type in (ParameterType.INSTRUMENT, ParameterType.DRIVER, ParameterType.CONTROLLER):
@@ -627,16 +652,25 @@ class ChimeraCLI (object):
                 option_action = "callback"
                 option_type = "string"
                 option_callback = InstrumentDriverCheckers.check_includepath
-
+                
+            if param.type == ParameterType.CHOICE:
+                option_action = "store"
+                option_type = "choice"
+                option_choices = param.choices
+                
             option_kwargs = dict(action=option_action,
                                  dest=param.name,
                                  help=param.help, metavar=param.metavar)
+
 
             if option_callback:
                 option_kwargs["callback"] = option_callback
 
             if option_type:
                 option_kwargs["type"] = option_type
+                
+            if option_choices:
+                option_kwargs["choices"] = option_choices
 
             if param.short:
                 group.add_option(param.short, param.long, **option_kwargs)
@@ -663,14 +697,25 @@ class ChimeraCLI (object):
         # actions in command line (and run) order
         actions = [ self._actions[action] for action in self.options.__order__ if action in self._actions ]
         
+        # add default actions
+        # FIXME: there is no way to disable a default action?
+        actions.extend([ action for action in self._actions.values() if action.default == True])
+        
         if not actions: return []
         
         for action in actions:
             for other in actions:
                 if action != other and action.actionGroup == other.actionGroup:
-                    self.exit("Cannot use %s and %s at the same time.\n" % (actions.long, other.long))
+                    self.exit("Cannot use %s and %s at the same time." % (action.long, other.long))
 
-        return actions
+        # remove duplicates
+        uniqueActions = []
+        
+        for action in actions:
+            if action in uniqueActions: continue
+            uniqueActions.append(action)
+
+        return uniqueActions
 
     def _validateParameters(self, options):
 
@@ -688,16 +733,36 @@ class ChimeraCLI (object):
                     newValue = getattr(self, param.target.__name__)(value)
                     setattr(options, name, newValue or value)
             except ValueError, e:
-                self.exit("Invalid value for %s: %s\n" % (name, e))
+                self.exit("Invalid value for %s: %s" % (name, e))
 
     def _runAction(self, action, options):
 
         try:
             if action.target is not None:
-                getattr(self, action.target.__name__)(options)
+                method = getattr(self, action.target.__name__)
+                method(options)
         except Exception, e:
-            self.err("Something wrong with '%s' action.\n" % (action.name))
+            self.err("Something wrong with '%s' action." % (action.name))
             sys.excepthook(*sys.exc_info())
             return False
 
         return True
+    
+    def _sighandler(self, sig=None, frame=None):
+        
+        if self._aborting == False:
+            self._aborting = True
+        else:
+            return
+            
+        if hasattr(self, '__abort__'):
+            abort = getattr(self, '__abort__')
+            if hasattr(abort, '__call__'):
+                t = threading.Thread(target=abort)
+                t.start()
+                t.join()
+                
+        self.exit(ret=2)
+        
+    def isAborting(self):
+        return self._aborting

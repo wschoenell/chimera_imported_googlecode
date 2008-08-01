@@ -216,6 +216,6 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
         drv = self.getDriver()
         return drv.getTemperature()
 
-    def getSetpoint(self):
+    def getSetPoint(self):
         drv = self.getDriver()
-        return drv.getSetpoint()
+        return drv.getSetPoint()

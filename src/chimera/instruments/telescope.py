@@ -28,6 +28,7 @@ from chimera.interfaces.telescopedriver import SlewRate
 from chimera.core.lock import lock
 
 from chimera.util.position import Position
+from chimera.util.simbad import Simbad
 
 
 __all__ = ["Telescope"]
@@ -117,8 +118,9 @@ class Telescope(ChimeraObject,
 
     @lock
     def slewToObject(self, name):
-        # FIXME
-        return ITelescopeSlew.slewToObject(self, name)
+        simbad = Simbad()
+        target = simbad.lookup(name)
+        self.getDriver().slewToRaDec(target)
 
     @lock
     def slewToRaDec(self, position):

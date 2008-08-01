@@ -129,7 +129,7 @@ class Location(object):
         if not isinstance (loc, Location):
             loc = Location (loc)
 
-        return (loc.cls == self.cls)  and \
+        return (loc.cls.lower() == self.cls.lower())  and \
                (loc.name == self.name)
 
     def __ne__ (self, loc):
