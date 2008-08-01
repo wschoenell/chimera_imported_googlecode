@@ -1,5 +1,5 @@
 from elixir import Entity, Field, using_options
-from elixir import DateTime, Float, Integer, UnicodeText, PickleType, Boolean, Text
+from elixir import DateTime, Float, Integer, PickleType, Boolean, Text
 from elixir import OneToMany, ManyToOne, ManyToMany
 from elixir import metadata, setup_all
 
@@ -17,8 +17,8 @@ from chimera.interfaces.camera  import Shutter, Binning, Window
 class Constraint(Entity):
     using_options(tablename='constraints')
     
-    caption = Field(UnicodeText, default='Constraint')        #Constraint name (specified by PI)
-    type    = Field(UnicodeText)        #Module providing constraint logic
+    caption = Field(Text, default='Constraint')        #Constraint name (specified by PI)
+    type    = Field(Text)        #Module providing constraint logic
     min     = Field(Float, default=0)              #Minimum value passed to constraint logic
     max     = Field(Float, default=0)              #Maximum value passed to constraint logic
     
@@ -32,7 +32,7 @@ class Constraint(Entity):
 class Exposure(Entity):
     using_options(tablename='exposures')
 
-    filter      = Field(UnicodeText, default=u'CLEAR')      #ASCII value of filter to use
+    filter      = Field(Text, default='CLEAR')      #ASCII value of filter to use
     frames      = Field(Integer, default=1)                #Frames to take
     
     duration    = Field(Integer, default=5)                #Seconds per frame
@@ -47,7 +47,7 @@ class Exposure(Entity):
     
     shutterOpen = Field(Boolean, default=True)
     
-    imageType   = Field(UnicodeText, default=u'OBJECT')
+    imageType   = Field(Text, default='object')
     
     priority    = Field(Integer, default=1000)    
     
@@ -60,14 +60,14 @@ class Exposure(Entity):
 class Observation(Entity):
     using_options(tablename='observations')
     
-    caption     = Field(UnicodeText, default=u'Observation')
+    caption     = Field(Text, default='Observation')
     timeBetweenExposuresMin     = Field(Integer, default=0)     #Seconds!
     timeBetweenExposuresMax     = Field(Integer, default=0)     #Seconds!
     lastExposureAt              = Field(DateTime)
     priority    = Field(Integer, default=1000)
     
     targetPos   = Field(PickleType, required=True)
-    targetName  = Field(UnicodeText, default='Sky')            #(object FITS header)
+    targetName  = Field(Text, default='Sky')            #(object FITS header)
     
     mapRAcount  = Field(Integer, default=1)     #Map cells along RA
     mapDECcount = Field(Integer, default=1)     #Map cells along DEC
@@ -83,8 +83,8 @@ class Observation(Entity):
 class Program(Entity):
     using_options(tablename='programs')
     
-    caption     = Field(UnicodeText, default=u'Program')
-    pi          = Field(UnicodeText, default=u'Anonymous Investigator')
+    caption     = Field(Text, default='Program')
+    pi          = Field(Text, default='Anonymous Investigator')
     priority    = Field(Integer, default=1000)
     
     timeBetweenObservationsMin  = Field(Integer, default=0)     #Seconds!

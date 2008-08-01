@@ -5,7 +5,9 @@ from chimera.controllers.schedulerng.machine import Machine
 from chimera.controllers.schedulerng.sequential import SequentialScheduler
 from chimera.controllers.schedulerng.states import State
 
-from chimera.interfaces.camera  import Shutter, Binning, Window
+from chimera.interfaces.camera  import Binning, Window, SHUTTER_OPEN, SHUTTER_CLOSE
+
+from chimera.controllers.imageserver.imagerequest import ImageRequest
 
 import chimera.core.log
 import logging
@@ -13,14 +15,17 @@ import threading
 from elixir import session
 
 class Controller(ChimeraObject):
-    __config__ = {"telescope"   : "/Telescope/0?driver=/FakeTelescope/0",
-                  "camera"      : "/Camera/0?driver=/FakeCamera/0",
-                  "filterwheel" : "/FilterWheel/0?driver=/FakeFilterWheel/0",
-                  "focuser"     : "/Focuser/0?driver=/FakeFocuser/0",
-                  "dome"        : "/Dome/0?driver=/FakeDome/0"}
+    __config__ = {"telescope"   : "/Telescope/0",
+                  "camera"      : "/Camera/0",
+                  "filterwheel" : "/FilterWheel/0",
+                  "focuser"     : "/Focuser/0",
+                  "dome"        : "/Dome/0",
+                  'site'        : '/Site/0'}
 
     def __init__(self):
         ChimeraObject.__init__(self)
+        mgr = self.getManager()
+        self.hostPort = mgr.getHostname() + ':' + mgr.getPort()
         self.machine = Machine(SequentialScheduler(), self)
         self.proxies = {}
 
@@ -57,6 +62,60 @@ class Controller(ChimeraObject):
         session.flush()
         
     def process(self, exposure):
+        self.log.debug('Acquiring proxies...')
+        telescope   = self.getManager().getProxy(self['telescope'])
+        dome        = self.getManager().getProxy(self['dome'])
+        camera      = self.getManager().getProxy(self['camera'])
+        filterwheel = self.getManager().getProxy(self['filterwheel'])
+        
+        observation = exposure.observation
+        if observation == None:
+            raise ObjectNotFoundException('Unable to find associated observation')
+
+        program = observation.program
+        if program == None:
+            raise ObjectNotFoundException('Unable to find associated program')
+        
+        
+        self.log.debug('Attempting to slew telescope to ' + observation.targetPos.__str__())
+        telescope.slewToRaDec(observation.targetPos)
+        self.log.debug('Setting filter...')
+        filterwheel.setFilter(exposure.filter)
+        while (telescope.isSlewing() | dome.isSlewing()):
+            self.log.debug('Waiting for slew to finish. Dome: ' + dome.isSlewing().__str__() + '; Tel:' + telescope.isSlewing().__str__())
+            time.sleep(1)
+        self.log.debug('Telescope Slew Complete')
+        while (filterwheel.getFilter() != exposure.filter):
+            self.log.debug('Waiting for filterwheel to finish. Current: ' + filterwheel.getFilter().__str__() + '; Wanted: ' + exposure.filter.__str__())
+            time.sleep(1)
+        self.log.debug('Filter set')
+        
+        self.log.debug('Generating exposure request..')
+        
+        if exposure.shutterOpen:
+            shutter=('Open', SHUTTER_OPEN)
+        else:
+            shutter=('Closed', SHUTTER_CLOSE)
+        
+        ir = ImageRequest(
+                          duration = exposure.duration,
+                          shutter=shutter,
+                          headers = [
+                                     ('OBJECT', observation.targetName, 'Object name'),
+                                     ('TRGT_RA', observation.targetPos.ra.__str__(), 'Target RA'),
+                                     ('TRGT_DEC', observation.targetPos.dec.__str__(), 'Target DEC'),
+                                     ('PROGRAM', program.caption, 'Program Name'),
+                                     ('PROG_PI', program.pi, 'Program\'s PI'),
+                                     ],
+                          metadatapre = [
+                                         self.hostPort+self['telescope'],
+                                         self.hostPort+self['camera'],
+                                         self.hostPort+self['filterwheel'],
+                                         self.hostPort+self['focuser'],
+                                         self.hostPort+self['dome'],
+                                         self.hostPort+self['site'],
+                                         ]
+                          )
 #        self.proxies['telescope']._transferThread()
 #        self.proxies['dome']._transferThread()
 #        self.proxies['camera']._transferThread()

@@ -131,6 +131,7 @@ class CameraNG (ChimeraObject, ICameraExpose, ICameraTemperature):
                 return imageURIs
             
             try:
+                imageRequest.addPreHeaders(self.getManager())
                 imageURI = drv.expose(imageRequest)
                 self.log.debug('Got back imageURI = ' + imageURI.__str__())
                 

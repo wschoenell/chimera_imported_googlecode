@@ -102,15 +102,3 @@ class Pipe:
       print "Reduction no. %i saved to %s" % ((i+1), redloc) 
       i+=1 
     
-   
-     
-      
-
-
-
-
-
-
-
- 
-
