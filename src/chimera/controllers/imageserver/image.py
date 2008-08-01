@@ -1,11 +1,11 @@
-from chimera.core.chimeraobject import ChimeraObject
+from chimera.core.remoteobject import RemoteObject
 from Pyro.errors import NamingError
-from chimera.core.path import ChimeraPath
 from chimera.interfaces.cameradriver import Bitpix
 from chimera.controllers.imageserver.imageuri import ImageURI
 from chimera.core.exceptions import ClassLoaderException
 import Pyro.util
 from chimera.controllers.imageserver.imageserver import ImageServer
+from chimera.core.version import _chimera_description_
 
 fits_date_format = "%Y-%m-%dT%H:%M:%S"
 
@@ -31,10 +31,10 @@ import time
 #        return hash
 
 
-class Image(ChimeraObject):
+class Image(RemoteObject):
     
     def __init__(self, fileName = None):
-        ChimeraObject.__init__(self)
+        RemoteObject.__init__(self)
         
         self.imageServer = ImageServer.getImageServer()
         
@@ -49,7 +49,11 @@ class Image(ChimeraObject):
             self.path = os.path.realpath(self.path)
             self.header = pyfits.getheader(fileName)
             self.myGUID = self.header['CHM_IMID']
-        self.imageServer.registerImage(self)
+        
+        try:
+            self.imageServer.registerImage(self)
+        except Exception, e:
+            print ''.join(Pyro.util.getPyroTraceback(e))
         pass
         
     def getID(self):
@@ -63,7 +67,7 @@ class Image(ChimeraObject):
         return self.path
     
     def getURI(self):
-        return ImageURI(self.imageServer, self.getHash)
+        return ImageURI(self.imageServer, self.getID())
     
     @staticmethod
     def imageFromFile(fileName):
@@ -73,17 +77,14 @@ class Image(ChimeraObject):
         return toReturn
             
     @staticmethod
-    def imageFromImg(img, imageRequest, dict = None):
+    def imageFromImg(img, imageRequest, hdrs = []):
         image = Image()
         
         hdu = pyfits.PrimaryHDU(img)
         
-        if dict == None:
-            dict = []
- 
-        file_date = time.strftime(fits_date_format, time.gmtime())
+        file_date = Image.formatDate(time.gmtime())
                                                                                             
-        basic_headers = [("EXPTIME", float(exptime) or -1, "exposure time in seconds"),
+        basic_headers = [("EXPTIME", float(imageRequest['exp_time']) or -1, "exposure time in seconds"),
                          ("DATE", file_date, "date of file creation"),
                          #("DATE-OBS", obs_date, "date of the start of observation"),       #From cameradriver
                          #("MJD-OBS", 0.0, "date of the start of observation in MJD"),      #Not needed
@@ -122,7 +123,7 @@ class Image(ChimeraObject):
         #if imageRequest['bitpix'] == Bitpix.uint16:
         hdu.scale('int16', '', bzero=32768, bscale=1)
         
-        for header in basic_headers + dict:
+        for header in basic_headers + imageRequest['accum_headers'] + hdrs:
             hdu.header.update(*header)
         
         image.path = image.imageServer.getFileName(imageRequest['filename'])
@@ -138,5 +139,7 @@ class Image(ChimeraObject):
     
     @staticmethod
     def formatDate(date):
+        if isinstance(date, float):
+            date=time.gmtime(date)
         return time.strftime(fits_date_format, date)
     

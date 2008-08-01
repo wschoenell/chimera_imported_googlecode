@@ -22,7 +22,7 @@
 import threading
 import os
 import time
-
+import Pyro.util
 
 from chimera.core.chimeraobject import ChimeraObject
 from chimera.interfaces.camera import ICameraExpose, ICameraTemperature, SHUTTER_LEAVE
@@ -133,7 +133,10 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
             
             try:
                 imageRequest.addPreHeaders(self.getManager())
-                imageURI = drv.expose(imageRequest)
+                try:
+                    imageURI = drv.expose(imageRequest)
+                except Exception, e:
+                    print ''.join(Pyro.util.getPyroTraceback(e))
                 self.log.debug('Got back imageURI = ' + imageURI.__str__())
                 
                 if imageURI:
@@ -187,8 +190,8 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
     
     def getMetadata(self):
         return [
-                ('INSTRUME', self['camera_model'], 'Camera Model'),
-                ('CCD',      self['ccd_model'], 'CCD Model'),
+                ('INSTRUME', str(self['camera_model']), 'Camera Model'),
+                ('CCD',      str(self['ccd_model']), 'CCD Model'),
                 ('CCD_DIMX', self['ccd_dimension_x'], 'CCD X Dimension Size'),
                 ('CCD_DIMY', self['ccd_dimension_y'], 'CCD Y Dimension Size'),
                 ('CCDPXSZX', self['ccd_pixel_size_x'], 'CCD X Pixel Size [microns]'),

@@ -218,4 +218,4 @@ class ChimeraObject (RemoteObject, ILifeCycle):
         return self.objectGUID
     
     def getMetadata(self):
-        return {}
+        return []

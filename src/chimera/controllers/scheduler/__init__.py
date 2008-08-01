@@ -1,5 +1,4 @@
-from chimera.controllers.schedulerng.controller import Controller
-
+from chimera.controllers.scheduler.controller import Controller
 
 
 import sys
@@ -14,5 +13,5 @@ sys.excepthook = hook
 
 #This class is just here for naming purposes; all work is done by 
 #the Controller class in controller.py.
-class SchedulerNG(Controller):
+class Scheduler(Controller):
     pass

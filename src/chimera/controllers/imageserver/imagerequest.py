@@ -2,7 +2,7 @@ from chimera.core.chimeraobject import ChimeraObject
 from chimera.interfaces.cameradriver import Bitpix
 from chimera.interfaces.camera import SHUTTER_LEAVE, SHUTTER_OPEN,SHUTTER_CLOSE
 from chimera.core.exceptions import ChimeraValueError
-
+import Pyro.util
 import logging
 import chimera.core.log
 log = logging.getLogger(__name__)
@@ -78,8 +78,9 @@ class ImageRequest(dict):
             try:
                 proxy = manager.getProxy(proxyurl)
                 self['accum_headers']+=proxy.getMetadata()
-            except:
+            except Exception, e:
                 log.warning('Unable to get metadata from ' + proxyurl)
+                print ''.join(Pyro.util.getPyroTraceback(e))
 
     
     def addPostHeaders(self, manager):

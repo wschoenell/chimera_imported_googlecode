@@ -1,9 +1,16 @@
 from chimera.core.chimeraobject import ChimeraObject
 from chimera.util.filenamesequence import FilenameSequence
 from chimera.core.manager import Manager
+from chimera.core.exceptions import ObjectNotFoundException, ClassLoaderException
+from chimera.core.path import ChimeraPath
+import Pyro.util
 import time
 import os
 import os.path
+import string
+import random
+
+dateFormat="%d%m%y-%H%M%S"
 
 class ImageServer(ChimeraObject):
     __config__  = {'savedir':   '$HOME/images'}
@@ -15,36 +22,42 @@ class ImageServer(ChimeraObject):
         self.imagesByPath = {}
     
     def getFileName(self, filename='$DATE'):
-        dest = os.path.expanduser(self['savedir'])
-        dest = os.path.expandvars(dest)
-        dest = os.path.realpath(dest)
-        
-        if not os.path.exists(dest):
-            os.makedirs(dest)
-        if not os.path.isdir(dest):
-            raise OSError('A file with the same name as the desired dir already exists.')
-        
-        subs_dict = {"date": time.strftime(dateFormat, time.gmtime(obsTime))}
-
-        filename = string.Template(filename).safe_substitute(subs_dict)
-        
-        seq_num = FilenameSequence(os.path.join(dest, filename), extension='fits').next()
-
-        finalname = os.path.join(dest, "%s-%04d%s%s" % (filename, seq_num, os.path.extsep, ext))
-        
-        if os.path.exists(finalname):
-            tmp = finalname
-            finalname = os.path.join(dest, "%s-%04d%s%s" % (filename, int (random.random()*1000),
-                                                            os.path.extsep, ext))
-
-            self.log.debug ("Image %s already exists. Saving to %s instead." %  (tmp, finalname))
-
-        return finalname
+        try:
+            dest = os.path.expanduser(self['savedir'])
+            dest = os.path.expandvars(dest)
+            dest = os.path.realpath(dest)
+            
+            if not os.path.exists(dest):
+                os.makedirs(dest)
+            if not os.path.isdir(dest):
+                raise OSError('A file with the same name as the desired dir already exists.')
+            
+            subs_dict = {"date": time.strftime(dateFormat, time.gmtime())}
+    
+            filename = string.Template(filename).safe_substitute(subs_dict)
+            
+            seq_num = FilenameSequence(os.path.join(dest, filename), extension='fits').next()
+    
+            finalname = os.path.join(dest, "%s-%04d%s%s" % (filename, seq_num, os.path.extsep, 'fits'))
+            
+            if os.path.exists(finalname):
+                tmp = finalname
+                finalname = os.path.join(dest, "%s-%04d%s%s" % (filename, int (random.random()*1000),
+                                                                os.path.extsep, 'fits'))
+    
+                self.log.debug ("Image %s already exists. Saving to %s instead." %  (tmp, finalname))
+    
+            return finalname
+        except Exception, e:
+            print ''.join(Pyro.util.getPyroTraceback(e))
     
     def registerImage(self, image):
-        self.getDaemon().connect(image)
-        self.imagesByID += {image.getID(): image}
-        self.imagesByPath += {image.getPath(): image}
+        try:
+            self.getDaemon().connect(image)
+            self.imagesByID[image.getID()] = image
+            self.imagesByPath[image.getPath()] = image
+        except Exception, e:
+            print ''.join(Pyro.util.getPyroTraceback(e))
     
     def _isMyImage(self, imageURI):
         myMan = self.getManager()
@@ -61,7 +74,7 @@ class ImageServer(ChimeraObject):
             return None
         
     def __stop__(self):
-        for image in self.images.values():
+        for image in self.imagesByID.values():
             self.getDaemon().disconnect(image)
 
     
@@ -71,11 +84,18 @@ class ImageServer(ChimeraObject):
         manager = Manager.getManagerProxy()
         try:
             toReturn = manager.getProxy('/ImageServer/0')
-        except NameError:
-            toReturn = manager.addLocation('/ImageServer/imageserver', ChimeraPath.controllers())
+        except ObjectNotFoundException:
+            try:
+                toReturn = manager.addLocation('/ImageServer/imageserver', [ChimeraPath.controllers()])
+            except Exception, e:
+                print ''.join(Pyro.util.getPyroTraceback(e))
+                raise ClassLoaderException('Unable to create imageserver')
+        except Exception, e:
+            print ''.join(Pyro.util.getPyroTraceback(e))
+            raise ClassLoaderException('Unable to create imageserver')
         if not toReturn:
             raise ClassLoaderException('Unable to create or find an ImageServer')
-        
+        return toReturn
 
 
 

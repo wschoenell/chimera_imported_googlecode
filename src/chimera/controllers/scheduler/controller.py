@@ -1,9 +1,9 @@
 from chimera.core.chimeraobject import ChimeraObject
 from chimera.core.exceptions import ChimeraException, ObjectNotFoundException
 
-from chimera.controllers.schedulerng.machine import Machine
-from chimera.controllers.schedulerng.sequential import SequentialScheduler
-from chimera.controllers.schedulerng.states import State
+from chimera.controllers.scheduler.machine import Machine
+from chimera.controllers.scheduler.sequential import SequentialScheduler
+from chimera.controllers.scheduler.states import State
 
 from chimera.interfaces.camera  import SHUTTER_OPEN, SHUTTER_CLOSE#, Binning, Window 
 
@@ -14,6 +14,7 @@ import logging
 import threading
 from elixir import session
 import time
+import Pyro.util
 
 class Controller(ChimeraObject):
     __config__ = {"telescope"   : "/Telescope/0",
@@ -104,11 +105,11 @@ class Controller(ChimeraObject):
                           duration = exposure.duration,
                           shutter=shutter,
                           headers = [
-                                     ('OBJECT', observation.targetName, 'Object name'),
+                                     ('OBJECT', str(observation.targetName), 'Object name'),
                                      ('TRGT_RA', observation.targetPos.ra.__str__(), 'Target RA'),
                                      ('TRGT_DEC', observation.targetPos.dec.__str__(), 'Target DEC'),
-                                     ('PROGRAM', program.caption, 'Program Name'),
-                                     ('PROG_PI', program.pi, 'Program\'s PI'),
+                                     ('PROGRAM', str(program.caption), 'Program Name'),
+                                     ('PROG_PI', str(program.pi), 'Program\'s PI'),
                                      ],
                           metadatapre = [
                                          self.hostPort+self['telescope'],
@@ -119,8 +120,10 @@ class Controller(ChimeraObject):
                                          self.hostPort+self['site'],
                                          ]
                           )
-        
-        camera.expose(ir)
+        try:
+            camera.expose(ir)
+        except Exception, e:
+            print ''.join(Pyro.util.getPyroTraceback(e))
 #        self.proxies['telescope']._transferThread()
 #        self.proxies['dome']._transferThread()
 #        self.proxies['camera']._transferThread()

@@ -1,6 +1,6 @@
 from elixir import *
 
-from chimera.controllers.schedulerng.model import *
+from chimera.controllers.scheduler.model import *
 
 if __name__ == '__main__':
 

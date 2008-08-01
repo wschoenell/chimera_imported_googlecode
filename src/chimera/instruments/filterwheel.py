@@ -83,6 +83,6 @@ class FilterWheel (ChimeraObject, IFilterWheel):
 
     def getMetadata(self):
         return [
-                ('FWHEEL', self['model'], 'FilterWheel Model'),
-                ('FILTER',   self.getFilter(), 'Filter used for this observation'),
+                ('FWHEEL', str(self['model']), 'FilterWheel Model'),
+                ('FILTER',   str(self.getFilter()), 'Filter used for this observation'),
                 ] + self.getDriver().getMetadata()

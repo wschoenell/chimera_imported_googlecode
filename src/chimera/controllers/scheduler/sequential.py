@@ -1,6 +1,6 @@
 
-from chimera.controllers.schedulerng.ischeduler import IScheduler
-from chimera.controllers.schedulerng.model import *
+from chimera.controllers.scheduler.ischeduler import IScheduler
+from chimera.controllers.scheduler.model import *
 
 import chimera.core.log
 import logging
@@ -45,6 +45,7 @@ class SequentialScheduler (IScheduler):
             return self.rq.get()
 
     def done (self, task):
-        task._complete=True
+        task.finished=True
+        task.flush()
         self.rq.task_done()
         self.machine.wakeup()

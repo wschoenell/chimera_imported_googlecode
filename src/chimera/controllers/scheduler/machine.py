@@ -2,7 +2,7 @@ import chimera.core.log
 import threading
 import logging
 from chimera.core.chimeraobject import ChimeraObject
-from chimera.controllers.schedulerng.states import State
+from chimera.controllers.scheduler.states import State
 
 log = logging.getLogger(__name__)
 

@@ -310,8 +310,8 @@ class Dome(ChimeraObject, IDome):
         else:
             slit = 'Closed'
         return [
-                ('DOME_MDL', self['model'], 'Dome Model'),
-                ('DOME_TYP', self['type'], 'Dome Type'),
-                ('DOME_TRK', self['mode'], 'Dome Tracking/Standing'),
-                ('DOME_SLT', slit, 'Dome slit status'),
+                ('DOME_MDL', str(self['model']), 'Dome Model'),
+                ('DOME_TYP', str(self['type']), 'Dome Type'),
+                ('DOME_TRK', str(self['mode']), 'Dome Tracking/Standing'),
+                ('DOME_SLT', str(slit), 'Dome slit status'),
                 ] + self.getDriver().getMetadata()

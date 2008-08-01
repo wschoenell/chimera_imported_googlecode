@@ -140,11 +140,11 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
         w_file.close()
         r_file.close()
                 
-    def make_dark(self, shape, dtype):
+    def make_dark(self, shape, dtype, exptime):
         ret = N.zeros(shape, dtype=dtype)
         #Taken from specs for KAF-1603ME as found in ST-8XME
         #normtemp is now in ADU/pix/sec
-        normtemp= ((10 * 2**((self.__temperature-25)/6.3)) * self["exp_time"])/2.3
+        normtemp= ((10 * 2**((self.__temperature-25)/6.3)) * exptime)/2.3
         ret += normtemp + N.random.random(shape)  # +/- 1 variance in readout
         return ret
 
@@ -213,7 +213,7 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
 
         if (imageRequest["shutter"][1]==SHUTTER_CLOSE):
             self.log.info("Shutter closed -- making dark")
-            pix = self.make_dark((self["ccd_height"],self["ccd_width"]), N.float)
+            pix = self.make_dark((self["ccd_height"],self["ccd_width"]), N.float, imageRequest['exp_time'])
 
         else:
 
@@ -255,7 +255,7 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
                             self.log.warning("Error generating flat: " + str(e))
                         self.log.debug("Generating dark...")
                         try:
-                            pix += self.make_dark(pix.shape, N.float)
+                            pix += self.make_dark(pix.shape, N.float, imageRequest['exp_time'])
                         except Exception, e:
                             self.log.warning("Error generating dark: " + str(e))
             # without telescope/dome, or if dome/telescope aren't aligned, or the dome is closed
@@ -264,7 +264,7 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
                try:
                    self.log.info("Making simulated flat image: " + str(self["ccd_height"]) + "x" + str(self["ccd_width"]))
                    self.log.debug("Generating dark...")
-                   pix = self.make_dark((self["ccd_height"],self["ccd_width"]), N.float)
+                   pix = self.make_dark((self["ccd_height"],self["ccd_width"]), N.float, imageRequest['exp_time'])
                    self.log.debug("Making flat...")
                    pix += self.make_flat((self["ccd_height"],self["ccd_width"]), N.float)
                except Exception, e:
@@ -287,7 +287,7 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
         
         imageRequest.addPostHeaders(self.getManager())
         
-        Image.imageFromImg(pix, imageRequest, [
+        img = Image.imageFromImg(pix, imageRequest, [
                                                ('DATE-OBS',Image.formatDate(self.__lastFrameStart),'Date exposure started'),
                                                ('XBINNING',1,'Readout CCD Binning (x-axis)'),
                                                ('YBINNING',1,'Readout CCD Binning (y-axis)'),
@@ -299,9 +299,9 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
                                                ]
                            )
 
-        self.readoutComplete(next_filename)
+        self.readoutComplete(imageRequest)
         
-        return next_filename
+        return img
 
     def abortExposure(self):
 

@@ -264,7 +264,7 @@ class Telescope(ChimeraObject,
                 #TODO: Convert coordinates to proper equinox
                 #TODO: How to get ra,dec at start of exposure (not end)
                 #("EQUINOX", 2000.0, "equinox of celestial coordinate system"),
-                ('RA', self.getRA().toHMS().__str__(), 'Right ascension of the observed object'),
+                ('RA', self.getRa().toHMS().__str__(), 'Right ascension of the observed object'),
                 ('DEC', self.getDec().toDMS().__str__(), 'Declination of the observed object'),
                 ('ALT', self.getAlt().toDMS().__str__(), 'Altitude of the observed object'),
                 ('AZ', self.getAz().toDMS().__str__(),'Azimuth of the observed object')
