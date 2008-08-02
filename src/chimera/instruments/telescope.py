@@ -105,11 +105,11 @@ class Telescope(ChimeraObject,
 
     @lock
     def syncRaDec(self, position):
-         if not isinstance(position, Position):
-             position = Position.fromRaDec(*position)
+        if not isinstance(position, Position):
+            position = Position.fromRaDec(*position)
         
-         drv = self.getDriver()
-         drv.syncRaDec(position)
+        drv = self.getDriver()
+        drv.syncRaDec(position)
 
     @lock
     def syncAltAz(self, position):
@@ -143,7 +143,7 @@ class Telescope(ChimeraObject,
         try:
             drv.slewToAltAz(position)
         except Exception,e:
-            self.log.exception("Houston")
+            self.log.exception("Apollo 13 is out of control!")
 
     def abortSlew(self):
         drv = self.getDriver()

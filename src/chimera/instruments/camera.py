@@ -136,13 +136,14 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
                 imageRequest.addPreHeaders(self.getManager())
                 try:
                     imageURI = drv.expose(imageRequest)
+                    self.log.debug('Got back imageURI = ' + imageURI.__str__())
                 except Exception, e:
                     print ''.join(Pyro.util.getPyroTraceback(e))
-                self.log.debug('Got back imageURI = ' + imageURI.__str__())
                 
                 if imageURI:
                     
                     imageURIs.append(imageURI)
+                    del imageURI
                 
                 if interval > 0 and frame_num < frames:
                     time.sleep(interval)

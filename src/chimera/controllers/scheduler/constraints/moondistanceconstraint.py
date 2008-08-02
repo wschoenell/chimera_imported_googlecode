@@ -1,4 +1,4 @@
-from chimera.controllers.scheduler.constraints.iconstraint import IConstraint
+from chimera.controllers.scheduler.constraints import IConstraint
 #from chimera.controllers.scheduler.constraints import ConstraintReturns
 
 class MoonDistanceConstraint(IConstraint):

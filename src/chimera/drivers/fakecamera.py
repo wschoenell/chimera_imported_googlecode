@@ -39,7 +39,7 @@ from chimera.controllers.imageserver.image import Image
 from chimera.core.chimeraobject      import ChimeraObject
 from chimera.core.exceptions         import ChimeraException, ObjectNotFoundException
 
-from chimera.util.imagesave import ImageSave
+#from chimera.util.imagesave import ImageSave
 
 from chimera.core.lock import lock
 
@@ -129,6 +129,7 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
         self.exposeComplete()
         return True
     
+    @staticmethod
     def eps_equal(a, b, eps=0.01):
         return abs(a-b) <= eps
 
