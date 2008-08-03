@@ -230,7 +230,7 @@ class Dome(ChimeraObject, IDome):
 
     def notSyncWithTel(self):
         if self.isSlewing():
-            return False
+            return True
         else:
             return self._needToMove(self.getTelescope().getAz())
 
