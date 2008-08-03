@@ -159,6 +159,7 @@ class Dome(ChimeraObject, IDome):
 
         self.log.debug("[event] telescope slewing to %s." % target)
         # FIXME: conversao equatorial-local
+        #FIXME: We cannot call this now due to deadlocking. Must be handled with normal control loop!
         #self._telescopeChanged(target.asAltAz(site.longitude(), site.lst()))
         return
         
@@ -167,14 +168,16 @@ class Dome(ChimeraObject, IDome):
 
         tel = self.getTelescope()
         self.log.debug("[event] telescope slew complete, new position=%s." % target)
-        self._telescopeChanged(tel.getAz())
+        #FIXME: We cannot call this now due to deadlocking. Must be handled with normal control loop!
+        #self._telescopeChanged(tel.getAz())
 
     def _telAbortCompleteClbk (self, position):
         if self.getMode() != Mode.Track: return
 
         tel = self.getTelescope()
         self.log.debug("[event] telescope aborted last slew, new position=%s." % position)
-        self._telescopeChanged(tel.getAz())
+        #FIXME: We cannot call this now due to deadlocking. Must be handled with normal control loop!
+        #self._telescopeChanged(tel.getAz())
 
     # utilitaries
     def getDriver(self):
@@ -224,6 +227,9 @@ class Dome(ChimeraObject, IDome):
         else:
             self.log.debug("[control] telescope still in the slit, standing"
                             " (dome az=%.2f, tel az=%.2f, delta=%.2f.)" % (self.getAz(), az, abs(self.getAz()-az)))
+
+    def notSyncWithTel(self):
+        return self._needToMove(self.getTelescope().getAz())
 
     def _needToMove (self, az):
         drv = self.getDriver()

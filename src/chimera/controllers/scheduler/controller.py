@@ -85,7 +85,7 @@ class Controller(ChimeraObject):
         telescope.slewToRaDec(observation.targetPos)
         self.log.debug('Setting filter to ' + str(exposure.filter) + '...')
         filterwheel.setFilter(str(exposure.filter))
-        while (telescope.isSlewing() | dome.isSlewing()):
+        while (telescope.isSlewing() | dome.isSlewing() | dome.notSyncWithTel()):
             self.log.debug('Waiting for slew to finish. Dome: ' + dome.isSlewing().__str__() + '; Tel:' + telescope.isSlewing().__str__())
             time.sleep(1)
         self.log.debug('Telescope Slew Complete')
