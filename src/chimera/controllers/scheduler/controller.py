@@ -22,7 +22,12 @@ class Controller(ChimeraObject):
                   "filterwheel" : "/FilterWheel/0",
                   "focuser"     : "/Focuser/0",
                   "dome"        : "/Dome/0",
-                  'site'        : '/Site/0'}
+                  'site'        : '/Site/0',
+                  'camTemp'     : -10,
+                  'camTempEnable': False,
+                  'camTempWait' : True,
+                  'allowDomeOpen': True,
+                  }
 
     def __init__(self):
         ChimeraObject.__init__(self)
@@ -40,18 +45,31 @@ class Controller(ChimeraObject):
             # alternatively, need to call proxy._transferThread() in new thread
             #Reason to get in destination thread is to avoid need to restart entire scheduler in case
             #remote manager dies for any reason and needs to be restarted. Otherwise, NameErrors may abound
-            self.proxies["telescope"]   = self.getManager().getProxy(self["telescope"])
-            self.proxies["camera"]      = self.getManager().getProxy(self["camera"])
-            self.proxies["filterwheel"] = self.getManager().getProxy(self["filterwheel"])
-            self.proxies["focuser"]     = self.getManager().getProxy(self["focuser"])
-            self.proxies["dome"]        = self.getManager().getProxy(self["dome"])
-            self.proxies["scheduler"]   = self.getProxy()
-
-            self.machine.proxies = self.proxies
+#            self.proxies["telescope"]   = self.getManager().getProxy(self["telescope"])
+#            self.proxies["camera"]      = self.getManager().getProxy(self["camera"])
+#            self.proxies["filterwheel"] = self.getManager().getProxy(self["filterwheel"])
+#            self.proxies["focuser"]     = self.getManager().getProxy(self["focuser"])
+#            self.proxies["dome"]        = self.getManager().getProxy(self["dome"])
+#            self.proxies["scheduler"]   = self.getProxy()
+#
+#            self.machine.proxies = self.proxies
             
-            self.proxies['telescope'].startTracking()
-            self.proxies['dome'].track()
-            self.proxies['dome'].openSlit()
+            mgr = self.getManager()
+            tel = mgr.getProxy(self['telescope'])
+            dome = mgr.getProxy(self['dome'])
+            camera = mgr.getProxy(self['camera'])
+            
+            tel.startTracking()
+            if self['allowDomeOpen']:
+                dome.openSlit()
+            dome.track()
+            if self['camTempEnable']:
+                self.log.debug('Starting to cool camera to %i ...' % self['camTemp'])
+                camera.startCooling(self['camTemp'])
+                while (self['camTempWait'] and abs(camera.getTemperature() - self['camTemp']) > 1):
+                    self.log.debug('Waiting for camera to reach setpoint temperature (current: %i, wanted: %i)...' % (camera.getTemperature(),self['camTemp']))
+                    time.sleep(2)
+                    
         except ObjectNotFoundException, e:
             raise ChimeraException("Cannot start scheduler. %s." % e)
 
@@ -63,6 +81,8 @@ class Controller(ChimeraObject):
         self.log.debug('Attempting to stop machine')
         self.machine.state(State.SHUTDOWN)
         self.log.debug('Attempted to stop machine')
+        if self['camTempEnable']:
+            self.getManager().getProxy(self['camera']).stopCooling()
         session.flush()
         
     def process(self, exposure):
@@ -85,7 +105,7 @@ class Controller(ChimeraObject):
         telescope.slewToRaDec(observation.targetPos)
         self.log.debug('Setting filter to ' + str(exposure.filter) + '...')
         filterwheel.setFilter(str(exposure.filter))
-        while (telescope.isSlewing() | dome.notSyncWithTel()):
+        while (telescope.isSlewing() or dome.notSyncWithTel()):
             self.log.debug('Waiting for slew to finish. Dome: ' + dome.isSlewing().__str__() + '; Tel:' + telescope.isSlewing().__str__())
             time.sleep(1)
         self.log.debug('Telescope Slew Complete')
