@@ -91,4 +91,6 @@ class ImageRequest(dict):
                 self['accum_headers']+=proxy.getMetadata()
             except:
                 log.warning('Unable to get metadata from ' + proxyurl)
-            
+    
+    def __str__(self):
+        return ('Duration: %f, Frames: %i, Shutter: %s, image_type: %s' % (self['exp_time'],self['frames'],self['shutter'][0],self['image_type']))

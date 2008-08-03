@@ -85,7 +85,7 @@ class Controller(ChimeraObject):
         telescope.slewToRaDec(observation.targetPos)
         self.log.debug('Setting filter to ' + str(exposure.filter) + '...')
         filterwheel.setFilter(str(exposure.filter))
-        while (telescope.isSlewing() | dome.isSlewing() | dome.notSyncWithTel()):
+        while (telescope.isSlewing() | dome.notSyncWithTel()):
             self.log.debug('Waiting for slew to finish. Dome: ' + dome.isSlewing().__str__() + '; Tel:' + telescope.isSlewing().__str__())
             time.sleep(1)
         self.log.debug('Telescope Slew Complete')
@@ -113,6 +113,7 @@ class Controller(ChimeraObject):
                                      ('PROGRAM', str(program.caption), 'Program Name'),
                                      ('PROG_PI', str(program.pi), 'Program\'s PI'),
                                      ],
+                          image_type = str(exposure.imageType),
                           metadatapre = [
                                          self.hostPort+self['telescope'],
                                          self.hostPort+self['camera'],
@@ -122,6 +123,7 @@ class Controller(ChimeraObject):
                                          self.hostPort+self['site'],
                                          ]
                           )
+        self.log.info('Running exposure ' + str(ir))
         try:
             camera.expose(ir)
         except Exception, e:

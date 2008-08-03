@@ -9,4 +9,6 @@ class ImageURI(Location):
 #        self._name = isL.name
 #        self.config = {'hash':hash}
         Location.__init__(self, cls=isL.cls, name=isL.name, host = imageServer.getManager().getHostname(), port = imageServer.getManager().getPort(), config={'hash':hash})
-        
+    
+    def __str__(self):
+        return Location.__str__(self) + ('?hash=%s' % str(self.config['hash']))

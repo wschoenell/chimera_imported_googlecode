@@ -229,7 +229,10 @@ class Dome(ChimeraObject, IDome):
                             " (dome az=%.2f, tel az=%.2f, delta=%.2f.)" % (self.getAz(), az, abs(self.getAz()-az)))
 
     def notSyncWithTel(self):
-        return self._needToMove(self.getTelescope().getAz())
+        if self.isSlewing():
+            return False
+        else:
+            return self._needToMove(self.getTelescope().getAz())
 
     def _needToMove (self, az):
         drv = self.getDriver()
@@ -293,8 +296,24 @@ class Dome(ChimeraObject, IDome):
 
     @lock
     def getAz (self):
+        tries = 3
+        left = tries
         drv = self.getDriver()
-        return drv.getAz ()
+        #FIXME: dome deiver failure bandaid
+        while left>0:
+            left-=1
+            try:
+                return drv.getAz ()
+            except IOError:
+                if left > 0:
+                    self.log.exception('We couldn\'t get the azimuth retrying... (%i left)' % left)
+                    man = self.getManager()
+                    man.stop(self['driver'])
+                    man.start(self['driver'])
+                else:
+                    self.log.exception('Couldn\'t get the azimuth. We failed after %i tries.' % tries)
+                    raise
+                
 
     @lock
     def openSlit (self):

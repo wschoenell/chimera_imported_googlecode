@@ -136,7 +136,8 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
                 imageRequest.addPreHeaders(self.getManager())
                 try:
                     imageURI = drv.expose(imageRequest)
-                    self.log.debug('Got back imageURI = ' + imageURI.__str__())
+                    self.log.debug('Got back imageURI = ' + str(imageURI) + '[' + str(frame_num) + '/' + str(frames) + ']')
+                    self.log.info(str(imageRequest) + ': [' + str(frame_num) + '/' + str(frames) + '] done')
                 except Exception, e:
                     print ''.join(Pyro.util.getPyroTraceback(e))
                 
@@ -155,7 +156,7 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
         
     def abortExposure (self, readout=True):
         drv = self.getDriver()
-        drv.abortExposure(readout = True)
+        drv.abortExposure()
 
         return True
     
