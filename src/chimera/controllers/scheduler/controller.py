@@ -89,10 +89,13 @@ class Controller(ChimeraObject):
             self.log.debug('Waiting for slew to finish. Dome: ' + dome.isSlewing().__str__() + '; Tel:' + telescope.isSlewing().__str__())
             time.sleep(1)
         self.log.debug('Telescope Slew Complete')
-        while (str(filterwheel.getFilter()) != str(exposure.filter)):
-            self.log.debug('Waiting for filterwheel to finish. Current: ' + filterwheel.getFilter().__str__() + '; Wanted: ' + exposure.filter.__str__())
-            filterwheel.setFilter(str(exposure.filter))
-            time.sleep(1)
+        #FIXME: filterwheel doesn't respond properly!
+        #while (str(filterwheel.getFilter()) != str(exposure.filter)):
+        #    self.log.debug('Waiting for filterwheel to finish. Current: ' + filterwheel.getFilter().__str__() + '; Wanted: ' + exposure.filter.__str__())
+        #    filterwheel.setFilter(str(exposure.filter))
+        #    time.sleep(1)
+        if (str(filterwheel.getFilter()) != str(exposure.filter)):
+            self.log.warning('Filterwheel didn\'t behave as expected. Current: ' + filterwheel.getFilter().__str__() + '; Wanted: ' + exposure.filter.__str__())
         self.log.debug('Filter set')
         
         self.log.debug('Generating exposure request..')
