@@ -134,6 +134,7 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
             
             try:
                 imageRequest.addPreHeaders(self.getManager())
+                imageURI = None
                 try:
                     imageURI = drv.expose(imageRequest)
                     self.log.debug('Got back imageURI = ' + str(imageURI) + '[' + str(frame_num) + '/' + str(frames) + ']')

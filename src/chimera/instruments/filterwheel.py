@@ -59,8 +59,7 @@ class FilterWheel (ChimeraObject, IFilterWheel):
         try:
             return self.getFilters()[index]
         except ValueError:
-            self.log.warning("Driver returned an filter that I don't known the name.")
-            return filter
+           raise InvalidFilterPositionException("Driver returned an filter that I don't known the name.")
 
     def _getFilterPosition (self, name):
         return self.getFilters().index(name)
