@@ -304,7 +304,7 @@ class Dome(ChimeraObject, IDome):
             left-=1
             try:
                 return drv.getAz ()
-            except IOError:
+            except IOError, ValueError:
                 if left > 0:
                     self.log.exception('We couldn\'t get the azimuth retrying... (%i left)' % left)
                     man = self.getManager()
