@@ -20,10 +20,15 @@
 
 import sys
 
-import Pyro.util
+try:
+    import Pyro.util
 
-def hook (e,v,t):
-    print ''.join(Pyro.util.getPyroTraceback(v))
-#sys.excepthook =lambda exctype, value, traceback: Pyro.util.getPyroTraceback(value)
-sys.excepthook = hook
-#sys.excepthook()
+    def hook (e,v,t):
+        print ''.join(Pyro.util.getPyroTraceback(v))
+        #sys.excepthook =lambda exctype, value, traceback: Pyro.util.getPyroTraceback(value)
+        sys.excepthook = hook
+        #sys.excepthook()
+except:
+    #We don't have pyro -- don't worry about this.
+    #FIXME: Get a working excepthook for everything and everyone!
+    pass
