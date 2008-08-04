@@ -56,7 +56,7 @@ class Dome(ChimeraObject, IDome):
         drv = self.getDriver()
         drv.ping()
         
-        drv.slewBegin    += self.getProxy()._slewBeginClbk
+        drv.slewBegin     += self.getProxy()._slewBeginClbk
         drv.slewComplete  += self.getProxy()._slewCompleteClbk
         drv.abortComplete += self.getProxy()._abortCompleteClbk
         drv.slitOpened    += self.getProxy()._slitOpenedClbk

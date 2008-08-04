@@ -70,7 +70,7 @@ if sys.platform == "win32":
     win32_cdeps = ["numpy == 1.0.4"]
     win32_deps += ["pywin32 == 210"]
 else:
-    linux_cdeps = ["numpy==1.1.0"]
+    linux_cdeps = ["numpy>=1.1.0"]
     linux_deps += ["python-sbigudrv >= 0.1", "coords"]
 
     if sys.version_info[0:2] >= (2,5):
@@ -86,7 +86,8 @@ setup(name='chimera-python',
 
       # dependencies are installed bottom up, so put important things last
       install_requires = linux_deps + win32_deps + \
-                         ["suds == 0.2.4",
+                         ["PyYAML >= 3.0.5",
+                          "suds == 0.2.4",
                           "asciidata == 1.1",
                           "sqlalchemy >= 0.4.5",
                           "Elixir >= 0.5.2",

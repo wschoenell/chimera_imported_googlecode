@@ -18,6 +18,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+#TODO: better simulation
+#TODO: fix interfaces!!!
+
 import time
 import random
 import threading
@@ -64,6 +67,7 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
         self.__abort = threading.Event()
         self.__lastFilter = 0
         self.__temperature = 20.0
+        self.__setpoint = 0
         self.__lastFrameStart = 0
 
     def __start__ (self):
@@ -77,7 +81,8 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
 
     def control (self):
         if self.isCooling():
-            self.__temperature -= 1.5
+            if self.__temperature > self.__setpoint:
+                self.__temperature -= 0.5
             
         return True
 
@@ -318,6 +323,7 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
     @lock
     def startCooling(self):
         self.__cooling = True
+        self.__setpoint = self["temp_setpoint"]
         return True
 
     @lock
@@ -331,6 +337,9 @@ class FakeCamera (ChimeraObject, ICameraDriver, IFilterWheelDriver):
     @lock
     def getTemperature(self):
         return self.__temperature + random.random()
+    
+    def getSetPoint(self):
+        return self.__setpoint
 
     def getFilter (self):
         return self.__lastFilter

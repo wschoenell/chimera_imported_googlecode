@@ -28,7 +28,7 @@ from chimera.interfaces.telescopedriver import SlewRate
 from chimera.core.lock import lock
 
 from chimera.util.position import Position
-import datetime
+from chimera.util.simbad import Simbad
 
 
 __all__ = ["Telescope"]
@@ -113,13 +113,14 @@ class Telescope(ChimeraObject,
 
     @lock
     def syncAltAz(self, position):
-        # FIXME
+        #FIXME: telescope alt/az sync
         return ITelescopeSync.syncAltAz(self, position)
 
     @lock
     def slewToObject(self, name):
-        # FIXME
-        return ITelescopeSlew.slewToObject(self, name)
+        simbad = Simbad()
+        target = simbad.lookup(name)
+        self.getDriver().slewToRaDec(target)
 
     @lock
     def slewToRaDec(self, position):
@@ -143,7 +144,7 @@ class Telescope(ChimeraObject,
         try:
             drv.slewToAltAz(position)
         except Exception,e:
-            self.log.exception("Apollo 13 is out of control!")
+            self.log.exception("Apollo 13 is tumbling out of control!")
 
     def abortSlew(self):
         drv = self.getDriver()

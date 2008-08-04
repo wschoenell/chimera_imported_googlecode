@@ -19,20 +19,19 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-import sys
 import os.path
 import logging
 import optparse
-from xml.parsers.expat import ExpatError, ErrorString
-
-import chimera.util.etree.ElementTree as ET
 
 from chimera.core.location import Location
 from chimera.core.manager import Manager
+from chimera.core.systemconfig import SystemConfig
 from chimera.core.version import _chimera_version_, _chimera_description_
-from chimera.controllers.site.config import SiteConfig
-from chimera.core.exceptions import ChimeraException, printException, InvalidLocationException
-from chimera.core.constants import MANAGER_DEFAULT_HOST, MANAGER_DEFAULT_PORT
+from chimera.core.exceptions import printException, InvalidLocationException
+from chimera.core.constants import (MANAGER_DEFAULT_HOST,
+                                    MANAGER_DEFAULT_PORT,
+                                    SYSTEM_CONFIG_DEFAULT_FILENAME,
+                                    SYSTEM_CONFIG_DEFAULT_GLOBAL)
 
 from chimera.core.site import Site
 from chimera.core.path import ChimeraPath
@@ -45,7 +44,9 @@ log = logging.getLogger(__name__)
 
 class SiteController (object):
 
-    def __init__(self, args = []):
+    def __init__(self, args = [], wait=True):
+        
+        self.wait = wait
 
         self.options, self.args = self.parseArgs(args)
 
@@ -83,7 +84,7 @@ class SiteController (object):
 
             eval ('parser.values.%s.append ("%s")' % (option.dest, value))
 
-        def check_xml (option, opt_str, value, parser):
+        def check_yaml (option, opt_str, value, parser):
 
             if not value or not os.path.exists (os.path.abspath(value)):
                 raise optparse.OptionValueError ("Couldn't found %s configuration file." % value)
@@ -113,7 +114,7 @@ class SiteController (object):
                                "This option could be setted many times to load multiple drivers.",
                           metavar="LOCATION")
 
-        parser.add_option("-f", "--file", action="callback", callback=check_xml,
+        parser.add_option("-f", "--file", action="callback", callback=check_yaml,
                           dest="config", type="string",
                           help="Load instruments and controllers defined on FILE."
                                "This option could be setted many times to load inst/controllers from multiple files.",
@@ -168,27 +169,27 @@ class SiteController (object):
     def startup(self):
 
 
-        # config file
-        self.config = SiteConfig(pyro_host=self.options.pyro_host, pyro_port=self.options.pyro_port)
+        # system config
+        self.config = SystemConfig.fromDefault()
         
-        for config in self.options.config:
-            self.config.read(config)
+        #for config in self.options.config:
+        #    self.config.read(config)
 
         # manager
         if not self.options.dry:
-            log.info("Starting system.")
-            log.info("Chimera prefix: %s" % ChimeraPath.root())
+            log.info("Chimera: version %s" % _chimera_version_)
+            log.info("Chimera: installed in %s" % ChimeraPath.root())
                 
-            self.manager = Manager(**self.config.getChimera())
-            log.info("Manager running on "+ self.manager.getHostname() + ":" + str(self.manager.getPort()))
+            self.manager = Manager(**self.config.chimera)
+            log.info("Chimera: running on "+ self.manager.getHostname() + ":" + str(self.manager.getPort()))
+            log.info("Chimera: reading configuration from %s" % SYSTEM_CONFIG_DEFAULT_GLOBAL)            
+            log.info("Chimera: reading configuration from %s" % SYSTEM_CONFIG_DEFAULT_FILENAME)
 
         # add site object
         if not self.options.dry:
             
-            sites = self.config.getSites()
-            
-            for site in sites:
-                self.manager.addClass(Site, site["name"], site, True)
+            for site in self.config.sites:
+                self.manager.addClass(Site, site.name, site.config, True)
             
         # search paths
         log.info("Setting objects include path from command line parameters...")
@@ -203,7 +204,7 @@ class SiteController (object):
 
         # init from config
         log.info("Trying to start drivers...")
-        for drv in self.config.getDrivers() + self.options.drivers:
+        for drv in self.config.drivers + self.options.drivers:
 
             if self.options.dry:
                 print drv
@@ -211,7 +212,7 @@ class SiteController (object):
                 self._add(drv, path=self.paths["drivers"], start=True)
 
         log.info("Trying to start instruments...")
-        for inst in self.config.getInstruments()+self.options.instruments:
+        for inst in self.config.instruments+self.options.instruments:
             
             if self.options.dry:
                 print inst
@@ -219,7 +220,7 @@ class SiteController (object):
                 self._add(inst, path=self.paths["instruments"], start=True)
 
         log.info("Trying to start controllers...")                
-        for ctrl in self.config.getControllers()+self.options.controllers:
+        for ctrl in self.config.controllers+self.options.controllers:
             
             if self.options.dry:
                 print ctrl
@@ -229,7 +230,7 @@ class SiteController (object):
         log.info("System up and running.")
 
         # ok, let's wait manager work
-        if not self.options.dry:
+        if self.wait and not self.options.dry:
             self.manager.wait()
 
     def _add (self, location, path, start):
