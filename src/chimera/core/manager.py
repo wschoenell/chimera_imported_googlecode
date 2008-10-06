@@ -30,12 +30,15 @@ from chimera.core.util          import getManagerURI
 from chimera.core.state         import State
 
 from chimera.core.exceptions   import InvalidLocationException, \
-                                      ObjectNotFoundException,  \
+                                      ObjectNotFoundException, \
                                       NotValidChimeraObjectException, \
                                       ChimeraObjectException, \
                                       ClassLoaderException, \
-                                      ChimeraException
+                                      ChimeraException, \
+                                      OptionConversionException
 
+
+from chimera.core.path import ChimeraPath
 
 import chimera.core.log
 
@@ -44,7 +47,6 @@ from chimera.core.constants import MANAGER_DEFAULT_HOST, MANAGER_DEFAULT_PORT, M
 try:
     import Pyro.core
     import Pyro.util
-    import Pyro.errors
 except ImportError, e:
     raise RuntimeError ("You must have Pyro version >= 3.6 installed.")
 
@@ -63,21 +65,18 @@ __all__ = ['Manager']
 
 log = logging.getLogger(__name__)
 
+firstManagerURI = False
 
 class ManagerAdapter (Pyro.core.Daemon):
 
     def __init__ (self, manager, host = None, port = None):
 
         Pyro.core.initServer(banner=False)
-
-        try:
-            Pyro.core.Daemon.__init__ (self,
-                                       host=host or MANAGER_DEFAULT_HOST,
-                                       port=port or MANAGER_DEFAULT_PORT,
-                                       norange=0)
-        except Pyro.errors.DaemonError, e:
-            log.error("Couldn't start Chimera server. Check errors below.")
-            raise
+        
+        Pyro.core.Daemon.__init__ (self,
+                                   host=host or MANAGER_DEFAULT_HOST,
+                                   port=port or MANAGER_DEFAULT_PORT,
+                                   norange=0)
 
         self.useNameServer(None)
         self.connect (manager)
@@ -138,9 +137,9 @@ class Manager (RemoteObject):
         self.adapterThread = threading.Thread(target=self.adapter.requestLoop)
         self.adapterThread.setDaemon(True)
         self.adapterThread.start()
-
+        
         # register ourself
-        self.resources.add(MANAGER_LOCATION, self, getManagerURI(host, port))
+        self.resources.add(MANAGER_LOCATION, self, getManagerURI(self.getHostname(), self.getPort()))
 
         # signals
         signal.signal(signal.SIGTERM, self._sighandler)
@@ -149,6 +148,21 @@ class Manager (RemoteObject):
 
         # shutdown event
         self.died = threading.Event()
+        
+        global firstManagerURI
+        
+        if not firstManagerURI:
+            firstManagerURI = Pyro.core.PyroURI(host=self.getHostname(),
+                                                port=self.getPort(),
+                                                objectID=MANAGER_LOCATION)
+    
+    @staticmethod
+    def getManagerProxy():
+        global firstManagerURI
+        
+        if not firstManagerURI:
+            raise ChimeraObjectException('Unable to find running manager')
+        return Proxy(uri = firstManagerURI)
 
 
     # private
@@ -180,6 +194,14 @@ class Manager (RemoteObject):
         Returns a list with the Location of all the available resources
         """
         return self.resources.keys()
+    
+    def getResourcesByClass(self, cls):
+        resources = self.getResources()
+        toRet=[]
+        for r in resources:
+            if r.cls == cls:
+                toRet.append(r)
+        return toRet
         
     # helpers
     
@@ -232,14 +254,18 @@ class Manager (RemoteObject):
         @rtype: Proxy
         """
 
-        if type(location) not in [StringType, Location]:
+        if not isinstance(location, StringType) and not isinstance(location, Location):
             if issubclass(location, ChimeraObject):
+                #TODO: Verify usage of host= and port= for lookup by class type;
+                #        currently, I don't know of any code which sets host=,port= when
+                #        requesting a location by class except for unit tests
                 location = Location(cls=location.__name__, name=name, host=host, port=port)
             else:
                 raise NotValidChimeraObjectException ("Can't get a proxy from non ChimeraObject's descendent object (%s)." % location)
 
         else:
-            location = Location(location,host=host,port=port)
+            #TODO: Verify that no one uses host= or port=
+            location = Location(location, host=host, port=port)
 
         # who manages this location?
         if self._belongsToMe(location):
@@ -529,7 +555,7 @@ class Manager (RemoteObject):
         @param location: The object to stop.
         @type location: Location or str
 
-        @raises ObjectNotFoundException: When te request object or the Manager was not found.
+        @raises ObjectNotFoundException: When the requested object or the Manager was not found.
         @raises ChimeraObjectException: Internal error on managed (user) object.
 
         @return: retuns True if sucessfull. False otherwise.
@@ -552,6 +578,7 @@ class Manager (RemoteObject):
 
             if resource.instance.getState() != State.STOPPED:
                 resource.instance.__stop__ ()
+                resource.instance.__setstate__(State.STOPPED)
 
             return True
 
@@ -559,3 +586,9 @@ class Manager (RemoteObject):
             log.exception("Error running %s __stop__ method. Exception follows..." % location)
             raise ChimeraObjectException("Error running %s __stop__ method." % location)
 
+    def getGUID(self):
+        return self.objectGUID
+    
+    @staticmethod
+    def getPath():
+        return ChimeraPath()

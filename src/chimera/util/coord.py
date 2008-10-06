@@ -24,6 +24,9 @@ import re
 import sys
 from types import StringType, LongType, IntType, FloatType
 
+TWO_PI = 2.0 * math.pi
+PI_OVER_TWO = (math.pi / 2.0)
+
 
 # to allow use of Coord outside of Chimera
 
@@ -48,7 +51,6 @@ __all__ = ['Coord',
 
 
 State = Enum("HMS", "DMS", "D", "H", "R", "AS")
-
 
 class CoordUtil (object):
 
@@ -168,7 +170,7 @@ class CoordUtil (object):
         return c.strfcoord()
 
     @staticmethod
-    def strfcoord (c, format=None, add_sign=True):
+    def strfcoord (c, format=None, signed=True):
         """strfcoord acts like sprintf family, allowing arbitrary
         coordinate conversion to str following the given template
         format.
@@ -181,7 +183,7 @@ class CoordUtil (object):
         s[s]: seconds (can be float)
         s[h]: hours
 
-        if add_sign was True, decimal degrees will always begins with
+        if signed was True, decimal degrees will always begins with
         a sign (+ or -) and hours values will have a negative sign if
         needed. Note that 
 
@@ -267,11 +269,68 @@ class CoordUtil (object):
                     s=s, ss=s,
                     h=h, hh=h)
 
-        if add_sign:
+        if signed:
             return (sign_str+format) % subs
         else:
             return format % subs
 
+    @staticmethod
+    def coordToR(coord):
+        if isinstance(coord, Coord):
+            return float(coord.toR())
+        else:
+            return float(coord)
+    
+    @staticmethod
+    def makeValid0to360(coord):
+        coordR = CoordUtil.coordToR(coord)
+        coordR = coordR % TWO_PI
+        if coordR < 0.0:
+            coordR += TWO_PI
+        return Coord.fromR(coordR)
+    
+    @staticmethod
+    def makeValid180to180(coord):
+        coordR = CoordUtil.coordToR(coord)
+        coordR = coordR % TWO_PI
+        if coordR > math.pi:
+            coordR -= TWO_PI
+        if coordR < (- math.pi):
+            coordR += TWO_PI
+        return Coord.fromR(coordR)
+                
+    @staticmethod
+    def raToHa(ra, lst):
+        return Coord.fromR(CoordUtil.coordToR(lst) - CoordUtil.coordToR(ra))
+    
+    @staticmethod
+    def haToRa(ha, lst):
+        return Coord.fromR(CoordUtil.coordToR(lst) - CoordUtil.coordToR(ha))
+    
+#    #coordRotate adopted from sidereal.py
+#    #http://www.nmt.edu/tcc/help/lang/python/examples/sidereal/ims/
+    
+    @staticmethod
+    def coordRotate (x, y, z):
+        """Used to convert between equatorial and horizon coordinates.
+    
+          [ x, y, and z are angles in radians ->
+              return (xt, yt) where
+              xt=arcsin(sin(x)*sin(y)+cos(x)*cos(y)*cos(z)) and
+              yt=arccos((sin(x)-sin(y)*sin(xt))/(cos(y)*cos(xt))) ]
+        """
+        #-- 1 --
+        xt  =  math.asin (math.sin(x) * math.sin(y) +
+                      math.cos(x) * math.cos(y) * math.cos(z))
+        #-- 2 --
+        yt  =  math.acos ((math.sin(x) - math.sin(y) * math.sin(xt)) /
+                      (math.cos(y) * math.cos(xt)))
+        #-- 3 --
+        if  math.sin(z) > 0.0:
+            yt  =  TWO_PI - yt
+    
+        #-- 4 --
+        return (xt, yt)
 
 class Coord (object):
     """L{Coord} represents a single angular coordinate.
@@ -526,8 +585,8 @@ class Coord (object):
         else:
             return '%.2f' % self.get()
 
-    def strfcoord (self, format=None):
-        return CoordUtil.strfcoord(self, format)
+    def strfcoord (self, *args, **kwargs):
+        return CoordUtil.strfcoord(self, *args, **kwargs)
 
     #
     # primitive conversion

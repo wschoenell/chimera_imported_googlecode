@@ -12,9 +12,9 @@ except ImportError:
 # to allow use outsise chimera
 
 try:
-    from chimera.util.coord import Coord
+    from chimera.util.coord import Coord, CoordUtil
 except ImportError:
-    from coord import Coord
+    from coord import Coord, CoordUtil
 
 try:
     from chimera.util.enum  import Enum
@@ -115,7 +115,7 @@ class Position (CoordsPosition):
             Position._checkRange(float(ra), 0, 360)
 
         except ValueError, e:
-            raise ValueError("Invalid RA coordinate %s" % str(ra))
+            raise ValueError("Invalid RA coordinate %s (%s)" % (str(ra), e))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid RA range %s. Must be between 0-24 hours or 0-360 deg." % str(ra))
 
@@ -134,7 +134,7 @@ class Position (CoordsPosition):
             Position._checkRange(float(dec), -90, 360)
 
         except ValueError, e:
-            raise ValueError("Invalid DEC coordinate %s" % str(dec))
+            raise ValueError("Invalid DEC coordinate %s (%s)" % (str(dec), e))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid DEC range %s. Must be between 0-360 deg or -90 - +90 deg." % str(dec))
 
@@ -151,7 +151,7 @@ class Position (CoordsPosition):
             Position._checkRange(float(az), -180, 360)
 
         except ValueError, e:
-            raise ValueError("Invalid AZ coordinate %s" % str(az))
+            raise ValueError("Invalid AZ coordinate %s (%s)" % (str(az), e))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid AZ range %s. Must be between 0-360 deg or -180 - +180 deg." % str(az))
 
@@ -164,7 +164,7 @@ class Position (CoordsPosition):
             Position._checkRange(float(alt), -90, 180)
 
         except ValueError, e:
-            raise ValueError("Invalid ALT coordinate %s" % str(alt))
+            raise ValueError("Invalid ALT coordinate %s (%s)" % (str(alt), e))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid ALT range %s. Must be between 0-180 deg or -90 - +90 deg." % str(alt))
 
@@ -193,7 +193,7 @@ class Position (CoordsPosition):
             Position._checkRange(float(long), -180, 360)
 
         except ValueError, e:
-            raise ValueError("Invalid LONGITUDE coordinate %s" % str(long))
+            raise ValueError("Invalid LONGITUDE coordinate %s (%s)" % (str(long), e))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid LONGITUDE range %s. Must be between 0-360 deg or -180 - +180 deg." % str(long))
 
@@ -206,7 +206,7 @@ class Position (CoordsPosition):
             Position._checkRange(float(lat), -90, 180)
 
         except ValueError, e:
-            raise ValueError("Invalid LATITUDE coordinate %s" % str(lat))
+            raise ValueError("Invalid LATITUDE coordinate %s (%s)" % (str(lat), e))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid LATITUDE range %s. Must be between 0-180 deg or -90 - +90 deg." % str(lat))
 
@@ -303,3 +303,29 @@ class Position (CoordsPosition):
 
     def rad (self):
         return self.R
+
+#    #raDecToAltAz and altAzToRaDec adopted from sidereal.py
+#    #http://www.nmt.edu/tcc/help/lang/python/examples/sidereal/ims/
+                
+    @staticmethod
+    def raDecToAltAz(raDec, latitude, lst):
+        decR = CoordUtil.coordToR(raDec.dec)
+        latR = CoordUtil.coordToR(latitude)
+        ha = CoordUtil.raToHa(raDec.ra, lst)
+        haR = CoordUtil.coordToR(ha)
+        
+        altR,azR = CoordUtil.coordRotate(decR, latR, haR)
+        
+        return Position.fromAltAz(Coord.fromR(CoordUtil.makeValid180to180(altR)), Coord.fromR(CoordUtil.makeValid0to360(azR)))
+    
+    @staticmethod
+    def altAzToRaDec(altAz, latitude, lst):
+        altR = CoordUtil.coordToR(altAz.alt)
+        latR = CoordUtil.coordToR(latitude)
+        azR = CoordUtil.coordToR(altAz.az)
+        
+        decR,haR = CoordUtil.coordRotate(altR, latR, azR)
+        
+        ra = CoordUtil.haToRa(haR, lst)
+        
+        return Position.fromRaDec(CoordUtil.makeValid0to360(ra), CoordUtil.makeValid180to180(decR))

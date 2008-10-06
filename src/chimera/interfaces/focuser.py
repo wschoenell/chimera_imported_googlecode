@@ -43,7 +43,7 @@ class IFocuser (Interface):
          to selected directions only (no position information).
     """
 
-    __config__ = {"driver": "/Fake/focus",
+    __config__ = {"driver": "/FakeFocuser/0",
                   "model": "Fake Focus Inc.",}
 
 
@@ -112,5 +112,11 @@ class IFocuser (Interface):
 
         @rtype   : int
         @return  : Current focuser position.
+        """
+
+    def getRange (self):
+        """Gets the focuser total range
+        @rtype: tuple
+        @return: Start and end positions of the focuser (start, end)
         """
 

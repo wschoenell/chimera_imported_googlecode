@@ -43,7 +43,7 @@ class ITelescopeDriverSlew (ITelescopeDriver):
                   "max_slew_time"       : 90.0, # s
                   "stabilization_time"  : 2.0, # s
                   "position_sigma_delta": 60.0, # arcseconds
-                  "skip_init"           : True} 
+                  "skip_init"           : False} 
     # methods
 
     def open(self):
@@ -104,7 +104,10 @@ class ITelescopeDriverSlew (ITelescopeDriver):
         pass
 
     def getTargetAltAz(self):
-        pass 
+        pass
+    
+    def getFocalLength(self):
+        pass
 
     # events
     

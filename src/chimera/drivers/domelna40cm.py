@@ -46,7 +46,7 @@ class DomeLNA40cm (ChimeraObject, IDomeDriver):
         self._slewing  = False
         self._slitOpen = False
 
-        self._az_shift = 180
+        self._az_shift = 0
 
     def __start__ (self):
         self.open()
@@ -67,8 +67,7 @@ class DomeLNA40cm (ChimeraObject, IDomeDriver):
 
         ret = self._readline ()
         if ret != "INVALIDO":
-            print "quirk", '"%"' % ret
-            raise ChimeraException ("Quirk error!!!")
+            raise ChimeraException ("Quirk error!!! (%s)" % str(ret))
 
         return True
 

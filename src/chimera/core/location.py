@@ -20,12 +20,13 @@
 
 
 import re
+import sys
 
 import chimera.core.log
 import logging
 log = logging.getLogger(__name__)
 
-from types import StringType
+from types import DictType, StringType
 
 from chimera.core.exceptions import InvalidLocationException
 
@@ -39,7 +40,10 @@ class Location(object):
     will fail.
     """
 
-    _re = re.compile('^(?P<host>[\w.]+)?(?(host)(?P<sep>:))?(?(sep)(?P<port>[\d]+))/+(?P<class>[\w]*)/+(?P<name>[\w]*)(?P<sep2>\??)?(?(sep2)(?P<config>[\w\S\s=,]*))')
+    if sys.version_info[0:2] >= (2,5):
+        _re = re.compile('^(?P<host>[\w.]+)?(?(host)(?P<sep>:))?(?(sep)(?P<port>[\d]+))/+(?P<class>[\w]*)/+(?P<name>[\w]*)(?P<sep2>\??)?(?(sep2)(?P<config>[\w\S\s=,]*))')
+    else:
+        _re = re.compile('^(?P<host>[\w.]+)?(?P<port>:[\d]+)?/+(?P<class>[\w]*)/+(?P<name>[\w]*)(?P<config>\?[\w\S\s=,]+)?')
 
     def __init__(self, location = None, **options):
 
@@ -101,6 +105,10 @@ class Location(object):
         conf = {}
 
         if matches["config"]:
+
+            # FIXME? py2.4 hack
+            if matches["config"][0] == "?":
+                matches["config"] = matches["config"][1:]
 
             for opt in matches['config'].split(","):
                 try:

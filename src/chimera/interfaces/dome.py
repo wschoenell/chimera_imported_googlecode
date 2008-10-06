@@ -47,12 +47,17 @@ class IDome (Interface):
     """A Roll-off or classic dome.
     """
 
-    __config__ = {"driver"   : "/DomeLNA40cm/dome",
+    __config__ = {"driver"   : "/FakeDome/0",
                   "telescope": "/Telescope/0",
                   "mode"     : Mode.Stand,
 
                   "model"    : "Fake Domes Inc.",
-                  "type"     : Type.Classic,}
+                  "type"     : Type.Classic,
+                  'stowPos'  : 155,
+                  'stowOnShutdown': True,
+                  'closeOnShutdown': True,
+                  'assumeOpenOnShutdown': False,    #If False, check first if dome is open before closing
+                  }
 
 
     def stand (self):

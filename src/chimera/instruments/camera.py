@@ -20,22 +20,21 @@
 
 
 import threading
-import os
 import time
-
+import Pyro.util
 
 from chimera.core.chimeraobject import ChimeraObject
-from chimera.interfaces.camera  import ICameraExpose, ICameraTemperature
-from chimera.interfaces.camera  import Shutter, Binning, Window
+from chimera.interfaces.camera import (ICameraExpose, ICameraTemperature, ICameraInformation)
 
-from chimera.core.exceptions import OptionConversionException
+from chimera.controllers.imageserver.imagerequest import ImageRequest
+
 from chimera.core.exceptions import ChimeraValueError
-from chimera.core.exceptions import ChimeraException
 
 from chimera.core.lock import lock
 
 
-class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
+class Camera (ChimeraObject,
+              ICameraExpose, ICameraTemperature, ICameraInformation):
 
     def __init__(self):
         ChimeraObject.__init__(self)
@@ -67,9 +66,14 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
         return True
 
     def __stop__ (self):
-
+        
+        if self.isExposing():
+            self.abortExposure(False)
+            while self.isExposing():
+                time.sleep(1)
+        
         # disconnect our callbacks
-        drv = self.getDriver()        
+        drv = self.getDriver()
 
         drv.exposeBegin       -= self.getProxy()._exposeBeginDrvClbk        
         drv.exposeComplete    -= self.getProxy()._exposeCompleteDrvClbk
@@ -97,94 +101,62 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
         self.temperatureChange(temp, delta)
 
     @lock
-    def expose (self, exp_time,
-                frames=1, interval=0.0,
-                shutter=Shutter.OPEN,
-                binning=Binning._1x1,
-                window=Window.FULL_FRAME,
-                filename="$HOME/images/$date.fits"):
+    def expose (self, request=None, **kwargs):
+
+        if request:
+
+            if isinstance(request, ImageRequest):
+                imageRequest = request
+            elif isinstance(request, dict):
+                imageRequest = ImageRequest(request)
+        else:
+            if kwargs:
+                imageRequest = ImageRequest(kwargs)
+            else:
+                imageRequest = ImageRequest()
+        
+        frames = imageRequest['frames']
+        interval = imageRequest['interval']
+
+        if frames == 1:
+            interval = 0.0
 
         # clear abort setting
         self.abort.clear()
 
-        if frames <= 0:
-            raise ValueError("'frames' must be > 0.")
-
-        if interval < 0:
-            raise ValueError("'interval' must be >= 0.")
-        
-        if exp_time < 0 or exp_time > (6*3600):
-            raise ValueError("'exp_time' must be >= 0 and <= 6 h.")
-
-        # setup window
-        window = None
-        if window == Window.FULL_FRAME:
-            window = (0.5, 0.5, 1.0, 1.0)
-        elif window == Window.TOP_HALF:
-            window = (0.5, 0.75, 1.0, 0.5)
-        elif window == Window.BOTTOM_HALF:
-            window = (0.5, 0.25, 1.0, 0.5)
-        else:
-            # assume FULL_FRAME
-            window = (0.5, 0.5, 1.0, 1.0)
-
-
-        directory = os.path.dirname(os.path.expandvars(filename)) or os.getcwd()
-        file_format, file_extension = os.path.splitext(os.path.split(filename)[1])
-
-        file_format = file_format or "$date"
-
-        if file_extension: file_extension=file_extension[1:] # exclude "." from extension
-        file_extension = file_extension or "fits"
-
-        # setup cam parameters
-        cam_params = dict(exp_time = exp_time,
-                          shutter = shutter,
-                          binning = binning,
-                          window_x = window[0],
-                          window_y = window[1],
-                          window_width = window[2],
-                          window_height = window[3],
-                          file_format = file_format,
-                          file_extension = file_extension,
-                          directory = directory,
-                          save_on_temp= True)
-
         # config driver
         drv = self.getDriver()
-        
-        try:
-            drv += cam_params
-        except (KeyError, OptionConversionException), e:
-            raise ChimeraException ("Something went wrong trying to setup camera driver parameters.")
 
-        # ok, here we go!
-        filenames = []
+        imageURIs = []
 
+        self.log.debug('Looping through ' + str(frames) + ' frames...')
         for frame_num in range(frames):
-
-            # abort set?
+            
             if self.abort.isSet():
-                return
-                
+                return imageURIs
+            
             try:
-                filename = drv.expose()
+                imageRequest.addPreHeaders(self.getManager())
 
-                if filename: # can be None if exposure was aborted and not saved
-                    filenames.append(filename)
-
-                if interval > 0 and frames > 1 and frame_num < frames:
-                    time.sleep(interval)
+                try:
+                    imageURI = drv.expose(imageRequest)
+                    imageURIs.append(imageURI)
+                    self.log.debug('Got back imageURI = ' + str(imageURI) + '[' + str(frame_num) + '/' + str(frames) + ']')
+                    self.log.info(str(imageRequest) + ': [' + str(frame_num) + '/' + str(frames) + '] done')
                     
+                except Exception, e:
+                    print ''.join(Pyro.util.getPyroTraceback(e))
+                
+                if interval > 0 and frame_num < frames:
+                    time.sleep(interval)
             except ValueError:
-                raise ChimeraValueError("An error occurried while trying to setup the exposure.")
-
-        return tuple(filenames)
-
+                raise ChimeraValueError('An error occurred while trying to take the exposure.')
+        
+        return tuple(imageURIs)
+                
+        
     def abortExposure (self, readout=True):
-        self.abort.set() # stop expose loop
         drv = self.getDriver()
-        drv += {"readout_aborted": readout}
         drv.abortExposure()
 
         return True
@@ -196,10 +168,7 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
     @lock
     def startCooling (self, tempC):
         drv = self.getDriver()
-        
-        drv += {"temp_setpoint": tempC}
-
-        drv.startCooling()
+        drv.startCooling(tempC)
         return True
 
     @lock
@@ -212,10 +181,71 @@ class Camera (ChimeraObject, ICameraExpose, ICameraTemperature):
         drv = self.getDriver()
         return drv.isCooling()
 
+    @lock
     def getTemperature(self):
         drv = self.getDriver()
         return drv.getTemperature()
 
+    @lock
     def getSetPoint(self):
         drv = self.getDriver()
         return drv.getSetPoint()
+
+    @lock
+    def startFan(self, rate=None):
+        drv = self.getDriver()
+        return drv.startFan(rate)
+
+    @lock
+    def stopFan(self):
+        drv = self.getDriver()
+        return drv.stopFan()
+
+    def isFanning(self):
+        drv = self.getDriver()
+        return drv.isFanning()
+
+    
+    def getMetadata(self):
+        return [
+                ('CAMERA', str(self['camera_model']), 'Camera Model'),
+                ('CCD',      str(self['ccd_model']), 'CCD Model'),
+                #('CCD_DIMX', self['ccd_dimension_x'], 'CCD X Dimension Size'),
+                #('CCD_DIMY', self['ccd_dimension_y'], 'CCD Y Dimension Size'),
+                #('CCDPXSZX', self['ccd_pixel_size_x'], 'CCD X Pixel Size [microns]'),
+                #('CCDPXSZY', self['ccd_pixel_size_y'], 'CCD Y Pixel Size [micrpns]'),
+                ] + self.getDriver().getMetadata()
+
+    def getCCDs(self):
+        drv = self.getDriver()
+        return drv.getCCDs()
+
+    def getCurrentCCD(self):
+        drv = self.getDriver()
+        return drv.getCurrentCCD()
+
+    def getBinnings(self):
+        drv = self.getDriver()
+        return drv.getBinnings()
+
+    def getADCs(self):
+        drv = self.getDriver()
+        return drv.getADCs()
+
+    def getPhysicalSize(self):
+        drv = self.getDriver()
+        return drv.getPhysicalSize()
+
+    def getPixelSize(self):
+        drv = self.getDriver()
+        return drv.getPixelSize()
+
+    def getOverscanSize(self, ccd=None):
+        drv = self.getDriver()
+        return drv.getOverscanSize()
+
+    def supports(self, feature=None):
+        drv = self.getDriver()
+        return drv.supports(feature)
+
+

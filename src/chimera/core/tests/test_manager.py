@@ -11,6 +11,8 @@ from chimera.core.exceptions   import InvalidLocationException, \
                                       ChimeraObjectException, \
                                       ClassLoaderException
 
+import os.path
+
 
 class Simple (ChimeraObject):
 

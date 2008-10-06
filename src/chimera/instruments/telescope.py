@@ -105,11 +105,11 @@ class Telescope(ChimeraObject,
 
     @lock
     def syncRaDec(self, position):
-         if not isinstance(position, Position):
-             position = Position.fromRaDec(*position)
+        if not isinstance(position, Position):
+            position = Position.fromRaDec(*position)
         
-         drv = self.getDriver()
-         drv.syncRaDec(position)
+        drv = self.getDriver()
+        drv.syncRaDec(position)
 
     @lock
     def syncAltAz(self, position):
@@ -144,7 +144,7 @@ class Telescope(ChimeraObject,
         try:
             drv.slewToAltAz(position)
         except Exception,e:
-            self.log.exception("Houston")
+            self.log.exception("Apollo 13 is out of control!")
 
     def abortSlew(self):
         drv = self.getDriver()
@@ -174,6 +174,23 @@ class Telescope(ChimeraObject,
     def moveSouth(self, offset, rate=SlewRate.MAX):
         drv = self.getDriver()
         return drv.moveSouth(offset, rate)
+
+    @lock
+    def moveOffset(self, offsetRA, offsetDec, rate=SlewRate.GUIDE):
+        drv = self.getDriver()
+        if offsetRA == 0 :
+            pass
+        elif offsetRA > 0 :
+            drv.moveEast(offsetRA, rate)
+        else:
+            drv.moveWest(abs(offsetRA), rate)
+
+        if offsetDec == 0 :
+            pass
+        elif offsetDec > 0 :
+            drv.moveNorth(offsetDec, rate)
+        else:
+            drv.moveSouth(abs(offsetDec), rate)
 
     def getRa(self):
         drv = self.getDriver()
@@ -254,3 +271,27 @@ class Telescope(ChimeraObject,
         drv = self.getDriver()
         return drv.isTracking()
         
+    def getMetadata(self):
+        return [
+                ('TELESCOP', self['model'], 'Telescope Model'),
+                ('OPTICS',   self['optics'], 'Telescope Optics Type'),
+                ('MOUNT', self['mount'], 'Telescope Mount Type'),
+                ('APERTURE', self['aperture'], 'Telescope aperture size [mm]'),
+                ('F_LENGTH', self['focal_length'], 'Telescope focal length [mm]'),
+                ('F_REDUCT', self['focal_reduction'], 'Telescope focal reduction'),
+                #TODO: Convert coordinates to proper equinox
+                #TODO: How to get ra,dec at start of exposure (not end)
+                ('RA', self.getRa().toHMS().__str__(), 'Right ascension of the observed object'),
+                ('DEC', self.getDec().toDMS().__str__(), 'Declination of the observed object'),
+                ("EQUINOX", 2000.0, "coordinate epoch"),
+                ('ALT', self.getAlt().toDMS().__str__(), 'Altitude of the observed object'),
+                ('AZ', self.getAz().toDMS().__str__(),'Azimuth of the observed object'),
+                ("WCSAXES", 2, "wcs dimensionality"),
+                ("RADESYS", "ICRS", "frame of reference"),
+                ("CRVAL1", self.getTargetRaDec().ra.D, "coordinate system value at reference pixel"),
+                ("CRVAL2", self.getTargetRaDec().dec.D, "coordinate system value at reference pixel"),
+                ("CTYPE1", 'RA---TAN', "name of the coordinate axis"),
+                ("CTYPE2", 'DEC---TAN', "name of the coordinate axis"),
+                ("CUNIT1", 'deg', "units of coordinate value"),
+                ("CUNIT2", 'deg', "units of coordinate value")                                              
+                ] + self.getDriver().getMetadata()
