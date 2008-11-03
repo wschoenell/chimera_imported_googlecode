@@ -26,7 +26,7 @@ from chimera.core.manager  import Manager
 from chimera.core.callback import callback
 from chimera.core.site     import Site
 
-from chimera.controllers.autofocus import Autofocus, Target, Mode
+from chimera.controllers.autofocus import Autofocus, Target
 
 from chimera.instruments.camera import Camera
 from chimera.drivers.fakecamera import FakeCamera
@@ -58,6 +58,9 @@ class TestAutofocus (object):
 
         #self.manager.addClass(OptecTCFS, "optec", {"device": "/dev/ttyS0"})
         #self.manager.addClass(Focuser, "focus", {"driver": "/OptecTCFS/0"})
+
+        #self.manager.addClass(Autofocus, "autofocus", {"camera" : "200.131.64.203:7666/Camera/0",
+        #                                               "focuser": "200.131.64.203:7666/Focuser/0"})
 
         self.manager.addClass(Autofocus, "autofocus", {"camera" : "/Camera/0",
                                                        "focuser": "/Focuser/0"})
@@ -98,8 +101,12 @@ class TestAutofocus (object):
         autofocus = self.manager.getProxy(Autofocus)
 
         autofocus += {"debug": True,
-                      "debug_path": "/home/henrique/work/chimera/sprint1/autofocus/run1"}
+                     "debug_path": "/home/henrique/ph/basic-run"}
 
-        best_focus = autofocus.focus(mode=Mode.FIT, target=Target.CURRENT,
-                                     exptime=10, points=25)
+        #best_focus = autofocus.focus(target=Target.CURRENT, exptime=10, start=0, end=7000, step=1000, minmax=(0,30))
+        best_focus = autofocus.focus(target=Target.CURRENT, exptime=10, start=0, end=7000, points=28)
+
+        #best_focus.plot("focus.png")
+        #best_focus.log("focus-lna.txt")
+
 

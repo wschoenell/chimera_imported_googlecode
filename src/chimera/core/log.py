@@ -60,6 +60,7 @@ fmt = ChimeraFormatter(fmt='%(asctime)s.%(msecs)d %(levelname)s %(name)s %(filen
 
 root = logging.getLogger("chimera")
 root.setLevel(logging.DEBUG)
+root.propagate = False
 
 # early log system (just console)
 
@@ -68,6 +69,7 @@ global consoleHandler
 consoleHandler = logging.StreamHandler(sys.stderr)
 consoleHandler.setFormatter(fmt)
 consoleHandler.setLevel(logging.WARNING)
+
 root.addHandler(consoleHandler)
 
 def setConsoleLevel (level):

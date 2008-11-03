@@ -1,45 +1,41 @@
-
-from chimera.util.enum import Enum
-
-from chimera.controllers.scheduler.clock    import Clock
-from chimera.controllers.scheduler.sensors  import Sensors
-from chimera.controllers.scheduler.schedulers   import *
-
-from chimera.controllers.scheduler.model import *
-
 import chimera.core.log
+from chimera.controllers.scheduler.states import State
 
-import logging
 import threading
+import logging
 
 log = logging.getLogger(__name__)
 
-
-__all__ = ['Machine', 'State']
-
-
-State = Enum("OFF", "DIRTY", "IDLE", "BUSY", "SHUTDOWN")
-
-
-class Machine (object):
-
+class Machine(threading.Thread):
+    
     __state = None
-    __stateLock  = threading.Lock()
-    __wakeUpCall = threading.Condition()    
+    __stateLock = threading.Lock()
+    __wakeUpCall = threading.Condition()
+    
+    def __init__(self, scheduler, controller):
+        threading.Thread.__init__(self)
 
-    def __init__ (self):
+        self.scheduler = scheduler
+        self.controller = controller
+        self.setDaemon(False)
 
-        self.proxies = {}
-        self.clock = Clock(self)
-        self.sensors = Sensors()
-        self.scheduler = SequentialScheduler()
         self.state(State.OFF)
+    
+    def state(self, state=None):
+        self.__stateLock.acquire()
+        try:
+            if not state: return self.__state
+            log.debug("Chaning state, from %s to %s." % (self.__state, state))
+            self.__state = state
+            self.wakeup()
+        finally:
+            self.__stateLock.release()
 
-    def run (self):
-
+    def run(self):
         log.info("Starting scheduler machine")
+        self.state(State.DIRTY)
 
-        while True:
+        while self.state() != State.SHUTDOWN:
 
             if self.state() == State.OFF:
                 log.debug("[off] will just sleep..")
@@ -56,7 +52,7 @@ class Machine (object):
                 log.debug("[idle] looking for something to do...")
 
                 # find something to do
-                exposure = self.scheduler.next(self.clock.now(), self.sensors.sense())
+                exposure = self.scheduler.next()
 
                 if exposure:
                     log.debug("[idle] there is something to do, processing...")
@@ -72,21 +68,13 @@ class Machine (object):
                 pass
 
             elif self.state() == State.SHUTDOWN:
-                log.debug("[shutdown] bye.")
+                log.debug("[shutdown] should die soon.")
                 break
 
-            # RIP
+            # Rest In Pieces/Let Sleeping Dogs Lie
             self.sleep()
-
-    def state(self, state=None):
-        self.__stateLock.acquire()
-        try:
-            if not state: return self.__state
-            log.debug("Chaning state, from %s to %s." % (self.__state, state))
-            self.__state = state
-            self.wakeup()
-        finally:
-            self.__stateLock.release()
+        
+        log.debug('[shutdown] thread ending...')
 
     def sleep(self):
         self.__wakeUpCall.acquire()
@@ -99,17 +87,19 @@ class Machine (object):
         log.debug("Waking up")
         self.__wakeUpCall.notifyAll()
         self.__wakeUpCall.release()
-
+        
     def _process(self, exp):
 
+        log.debug("Starting to process exposure: "+exp.__str__()) 
         def process ():
             try:
-                exp.process(self.proxies)
-            finally:
+                self.controller.process(exp)
+                #FIXME: We should only set done with exposure upon some callback from the imagesave routine
+                log.debug("Done with exposure: "+exp.__str__()) 
                 self.scheduler.done(exp)
+            finally:
                 self.state(State.IDLE)
                 
         t = threading.Thread(target=process)
         t.setDaemon(False)
         t.start()
-

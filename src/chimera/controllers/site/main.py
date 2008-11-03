@@ -26,7 +26,7 @@ import optparse
 from chimera.core.location import Location
 from chimera.core.manager import Manager
 from chimera.core.systemconfig import SystemConfig
-from chimera.core.version import _chimera_version_, _chimera_description_
+from chimera.core.version import _chimera_version_, _chimera_description_, find_dev_version
 from chimera.core.exceptions import printException, InvalidLocationException
 from chimera.core.constants import (MANAGER_DEFAULT_HOST,
                                     MANAGER_DEFAULT_PORT,
@@ -92,7 +92,7 @@ class SiteController (object):
             eval ('parser.values.%s.append ("%s")' % (option.dest, value))
 
 
-        parser = optparse.OptionParser(prog="chimera", version=_chimera_version_,
+        parser = optparse.OptionParser(prog="chimera", version=find_dev_version() or _chimera_version_,
                                        description=_chimera_description_,
                                        usage="chimera --help for more information")
 
@@ -177,8 +177,9 @@ class SiteController (object):
 
         # manager
         if not self.options.dry:
-            log.info("Chimera: version %s" % _chimera_version_)
-            log.info("Chimera: installed in %s" % ChimeraPath.root())
+            log.info("Starting system.")
+            log.info("Chimera version: %s" % find_dev_version() or _chimera_version_)
+            log.info("Chimera prefix: %s" % ChimeraPath.root())
                 
             self.manager = Manager(**self.config.chimera)
             log.info("Chimera: running on "+ self.manager.getHostname() + ":" + str(self.manager.getPort()))

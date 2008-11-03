@@ -1,9 +1,13 @@
 
+import chimera.core.log
+
+from chimera.core.remoteobject import RemoteObject
 from chimera.core.exceptions import ChimeraException
+from chimera.core.version import _chimera_name_, _chimera_long_description_
 
 from chimera.util.coord import Coord
 from chimera.util.position import Position
-
+from chimera.util.filenamesequence import FilenameSequence
 from chimera.util.sextractor import SExtractor
 
 import pyfits
@@ -16,14 +20,106 @@ except ImportError:
     have_pywcs = False
 
 import sys
+import time
+import os
+import string
+import datetime as dt
+import random
+
 from UserDict import DictMixin
+
+import logging
+log = logging.getLogger(__name__)
 
 
 class WCSNotFoundException (ChimeraException):
     pass
 
 
-class Image (DictMixin):
+class ImageUtil (object):
+
+    @staticmethod
+    def formatDate (datetime):
+        return datetime.strftime("%Y-%m-%dT%H:%M:%S")
+
+    @staticmethod
+    def makeFilename (path='$DATE-$TIME', subs={}, dateFormat="%d%m%y", timeFormat="%H%M%S"):
+        """Helper method to create filenames with increasing sequence number appended.
+
+        It can do variable substitution in the given path. Standard
+        variables are $DATE and $TIME (you can define the format of
+        these field passint the appropriate format string in
+        dateFormat and timeFormat, respectively).
+
+        Any other variable can be defined passing an subs dictionary
+        with key as variable name.
+
+        @param path: Filename path, with directories, environmnt variables.
+        @type  path: str
+
+        @param subs: Dictionary of {VAR=NAME,...} to create aditional
+                     variable substitutions.
+        @type subs: dict
+
+        @param dateFormat: Date format, as used in time.strftime, to
+                           be used by $DATE variable.
+        @type dateFormat: str
+
+        @param timeFormat: Time format, as used in time.strftime, to
+                           be used by $TIME variable.
+        @type timeFormat: str
+
+        @return: Filename.
+        @rtype: str
+        """
+
+        now = dt.datetime.now()
+
+        subs_dict = {"DATE" : now.strftime(dateFormat),
+                     "TIME" : now.strftime(timeFormat)}
+
+        # add any user-specific keywords
+        subs_dict.update(subs)
+
+        dirname, filename = os.path.split(path)
+
+        dirname = os.path.realpath(dirname)
+        dirname = os.path.expanduser(dirname)
+        dirname = os.path.expandvars(dirname)
+            
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        if not os.path.isdir(dirname):
+            raise OSError("A file with the same name as the desired directory already exists. ('%s')" % dirname)
+
+        basename, ext = os.path.splitext(filename)
+        if not ext:
+            ext = "fits"
+        else:
+            # remove first dot
+            ext = ext[1:]
+       
+        # make substitutions
+        dirname = string.Template(dirname).safe_substitute(subs_dict)
+        basename = string.Template(basename).safe_substitute(subs_dict)
+        ext = string.Template(ext).safe_substitute(subs_dict)
+
+        fullpath = os.path.join(dirname, basename)
+
+        seq_num = FilenameSequence(fullpath, extension=ext).next()
+    
+        finalname = os.path.join(dirname, "%s-%04d%s%s" % (basename, seq_num, os.path.extsep, ext))
+            
+        if os.path.exists(finalname):
+            tmp = finalname
+            finalname = os.path.join(dest, "%s-%04d%s%s" % (filename, int (random.random()*1000), os.path.extsep, ext))    
+            
+        return finalname
+
+
+
+class Image (DictMixin, RemoteObject):
     """
     Class to manipulate FITS images with a Pythonic taste.
 
@@ -41,42 +137,98 @@ class Image (DictMixin):
     """
 
     @staticmethod
-    def fromFile(filename, readonly=False, fix=True):
+    def fromFile(filename, fix=True):
 
-        if readonly:
-            mode = 'readonly'
-        else:
-            mode = 'update'
+        fd = pyfits.open(filename, mode="update")
 
-        fd = pyfits.open(filename, mode)
-
-        img = Image()
-        img.filename = filename
-        img.fd = fd
-        img.readonly = readonly
+        img = Image(filename, fd)
 
         if fix:
             img.fix()
 
         return img
 
-    def __init__ (self):
-        self.filename = ""
-        self.fd       = None
-        self.readonly = False
+    @staticmethod
+    def create (data, imageRequest=None, filename=None):
+        
+        if imageRequest:
+            try:
+                filename = imageRequest["filename"]
+            except KeyError:
+                if not filename:
+                    raise TypeError("Invalid filename, you must pass filename=something"
+                                    "or a valid ImageRequest object")
 
+        filename = ImageUtil.makeFilename(filename)
+
+        hdu = pyfits.PrimaryHDU(data)
+                                                                                            
+        headers = [("DATE", ImageUtil.formatDate(dt.datetime.now()), "date of file creation"),
+                   ("CREATOR", _chimera_name_, _chimera_long_description_)]
+
+        #TODO: Implement BITPIX support
+        hdu.scale('int16', '', bzero=32768, bscale=1)
+        
+        if imageRequest:
+            headers += imageRequest.headers
+        
+        for header in headers:
+            try:
+                hdu.header.update(*header)
+            except Exception, e:
+                log.warning("Couldn't add %s: %s" % (str(header), str(e)))
+        
+        hduList = pyfits.HDUList([hdu])
+        hduList.writeto(filename)
+        hduList.close()
+
+        del hduList
+        del hdu
+
+        return Image.fromFile(filename)
+
+
+    #
+    # standard constructor
+    #
+    def __init__ (self, filename, fd):
+        RemoteObject.__init__(self)
+
+        self._fd       = fd
+        self._filename = filename
+        self._http = None
         self._wcs = None
+
+
+    filename = lambda self: self._filename
+    
+    def http (self, http=None):
+        if http:
+            self._http = http
+        return self._http
+
+    #
+    # serialization support
+    # we close before pickle and reopen after it
+    #
+    def __getstate__ (self):
+        self._fd.close()
+        return self.__dict__
+
+    def __setstate__ (self, args):
+        self.__dict__ = args
+        self._fd = pyfits.open(self._filename, mode="update")
 
     #
     # geometry
     #
     
-    width  = property(lambda self: self["NAXIS1"])
-    height = property(lambda self: self["NAXIS2"])
+    width  = lambda self: self["NAXIS1"]
+    height = lambda self: self["NAXIS2"]
 
-    size = property(lambda self: (self.width, self.height))
+    size   = lambda self: (self.width(), self.height())
 
-    center = property(lambda self: (self.width/2.0, self.height/2.0))
+    center = lambda self: (self.width()/2.0, self.height()/2.0)
 
     #
     # WCS
@@ -87,7 +239,7 @@ class Image (DictMixin):
         if not self._findWCS():
             return (0,0)
 
-        pixel = self._valueAt(self._wcs.world2pixel_fits, *world)
+        pixel = self._valueAt(self._wcs.wcs_sky2pix_fits, *world)
 
         # round pixel to avoid large decimal numbers and get out strange -0
         pixel = list(round(p, 6) for p in pixel)
@@ -104,7 +256,7 @@ class Image (DictMixin):
         if not self._findWCS():
             return Position.fromRaDec(0,0)
 
-        world = self._valueAt(self._wcs.pixel2world_fits, *pixel)
+        world = self._valueAt(self._wcs.wcs_pix2sky_fits, *pixel)
         return Position.fromRaDec(Coord.fromD(world[0]), Coord.fromD(world[1]))
 
     def _findWCS (self):
@@ -113,9 +265,9 @@ class Image (DictMixin):
 
         if not self._wcs:
             try:
-                self._wcs = pywcs.WCS(self.fd["PRIMARY"].header)
+                self._wcs = pywcs.WCS(self._fd["PRIMARY"].header)
             except KeyError:
-                raise WCSNotFoundException("Couldn't found WCS information on %s" % (self.filename))
+                raise WCSNotFoundException("Couldn't find WCS information on %s" % (self._filename))
 
         return True
 
@@ -170,7 +322,7 @@ class Image (DictMixin):
 
         # ok, here we go!
         try:
-            sex.run(self.filename)
+            sex.run(self._filename)
             result = sex.catalog()
             return result
         finally:
@@ -181,37 +333,40 @@ class Image (DictMixin):
     #
     
     def fix (self):
-        self.fd.verify('fix')
+        self._fd.verify('fix')
 
     def save (self, filename=None, verify='exception'):
-        if self.readonly and not filename:
-            raise IOError("Cannot write. Image is readonly and no filename provided")
-        
+
         if filename:
-            self.fd.writeto(filename, output_verify=verify)
+            self._fd.writeto(filename, output_verify=verify)
         else:
-            self.fd.flush(output_verify=verify)
+            self._fd.flush(output_verify=verify)
 
         return True
 
     # dict mixin implementation for headers
     def __getitem__ (self, key):
-        return self.fd["PRIMARY"].header.__getitem__(key)
+        return self._fd["PRIMARY"].header.__getitem__(key)
         
     def __setitem__ (self, key, value):
-        return self.fd["PRIMARY"].header.__setitem__(key, value)
+
+        if not key in self:
+            self += (key, value)
+            return True
+
+        return self._fd["PRIMARY"].header.__setitem__(key, value)
 
     def __delitem__ (self, key):
-        return self.fd["PRIMARY"].header.__delitem__(key)
+        return self._fd["PRIMARY"].header.__delitem__(key)
 
     def keys (self):
-        return [item[0] for item in self.fd["PRIMARY"].header.items()]
+        return [item[0] for item in self._fd["PRIMARY"].header.items()]
 
     def items (self):
-        return self.fd["PRIMARY"].header.items()
+        return self._fd["PRIMARY"].header.items()
     
     def __contains__(self, key):
-        return self.fd["PRIMARY"].header.has_key(key)
+        return self._fd["PRIMARY"].header.has_key(key)
 
     def __iter__ (self):
         for k in self.keys():
@@ -238,6 +393,6 @@ class Image (DictMixin):
             headers = [headers]
 
         for header in headers:
-            self.fd["PRIMARY"].header.update(*header)
+            self._fd["PRIMARY"].header.update(*header)
 
         return self
