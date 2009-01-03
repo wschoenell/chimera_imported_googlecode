@@ -57,6 +57,7 @@ import signal
 import time
 import atexit
 import sys
+import SocketServer
 from types import StringType
 
 
@@ -149,7 +150,6 @@ class Manager (RemoteObject):
 
         # shutdown event
         self.died = threading.Event()
-        
 
     # private
     def __repr__ (self):
@@ -240,7 +240,12 @@ class Manager (RemoteObject):
         @rtype: Proxy
         """
 
+        if not location:
+            raise ObjectNotFoundException ("Couldn't found an object at the"
+                                           " given location %s" % location)
+
         if not isinstance(location, StringType) and not isinstance(location, Location):
+
             if issubclass(location, ChimeraObject):
                 #TODO: Verify usage of host= and port= for lookup by class type;
                 #        currently, I don't know of any code which sets host=,port= when

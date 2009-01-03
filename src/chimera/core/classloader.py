@@ -48,7 +48,7 @@ class ClassLoader (object):
 
         if not isinstance(path, (list, tuple)):
             path = [path]
-            
+
         sys.path = path + sys.path
 
         try:
@@ -83,7 +83,7 @@ class ClassLoader (object):
         # turns sys.path back
         [sys.path.remove (p) for p in path]
         
-        
+
         cls = None
         
         for k, v in vars(module).items():

@@ -18,22 +18,20 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-
-from chimera.core.constants    import SYSTEM_CONFIG_LOG_NAME
-
 import logging
 import logging.handlers
 import sys
 import os
 import os.path
 
+from chimera.core.constants import (SYSTEM_CONFIG_LOG_NAME,
+                                    SYSTEM_CONFIG_DIRECTORY)
 
 # try to use fatser (C)StringIO, use slower one if not available
 try:
     import cStringIO as StringIO
 except ImportError:
     import StringIO
-
 
 from chimera.core.exceptions import printException
 
@@ -55,21 +53,23 @@ class ChimeraFormatter (logging.Formatter):
         finally:
             stream.close()
 
+        
 fmt = ChimeraFormatter(fmt='%(asctime)s.%(msecs)d %(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s',
                        datefmt='%d-%m-%Y %H:%M:%S')
+
+try:
+    if not os.path.exists(SYSTEM_CONFIG_DIRECTORY):
+        os.mkdir(SYSTEM_CONFIG_DIRECTORY)
+except Exception:
+    pass
 
 root = logging.getLogger("chimera")
 root.setLevel(logging.DEBUG)
 root.propagate = False
 
-# early log system (just console)
-
-global consoleHandler
-        
 consoleHandler = logging.StreamHandler(sys.stderr)
 consoleHandler.setFormatter(fmt)
-consoleHandler.setLevel(logging.WARNING)
-
+consoleHandler.setLevel(logging.WARNING)    
 root.addHandler(consoleHandler)
 
 def setConsoleLevel (level):

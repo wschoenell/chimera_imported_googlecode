@@ -1,11 +1,14 @@
 from chimera.core.version   import _chimera_version_, _chimera_description_
 from chimera.core.constants import SYSTEM_CONFIG_DEFAULT_FILENAME
-from chimera.core.location import Location, InvalidLocationException
+from chimera.core.location  import Location, InvalidLocationException
+
 from chimera.core.systemconfig import SystemConfig
-from chimera.core.manager import Manager
+from chimera.core.manager      import Manager
+from chimera.core.path         import ChimeraPath
+
 from chimera.controllers.site.main import SiteController
-from chimera.core.exceptions import ObjectNotFoundException
-from chimera.core.path import ChimeraPath
+from chimera.core.exceptions       import ObjectNotFoundException, printException
+
 
 from chimera.util.enum      import Enum
 
@@ -14,6 +17,7 @@ import optparse
 import os.path
 import signal
 import threading
+import socket
 
 __all__ = ['ChimeraCLI',
            'Action',
@@ -21,7 +25,7 @@ __all__ = ['ChimeraCLI',
            'action',
            'parameter']
 
-ParameterType = Enum("INSTRUMENT", "DRIVER", "CONTROLLER", "BOOLEAN", "CHOICE", "INCLUDE_PATH")
+ParameterType = Enum("INSTRUMENT", "CONTROLLER", "BOOLEAN", "CHOICE", "INCLUDE_PATH", "CONSTANT")
 
 class Option (object):
     name  = None
@@ -42,9 +46,14 @@ class Option (object):
 
     target = None
     cls = None
-    instrument = None
+
     # if ParameterType.INSTRUMENT: is this instrument required?
     required = False
+
+    # if ParameterType.INSTRUMENT or ParameterType.CONTROLLER
+    location = None
+
+    const = None
 
     def __init__ (self, **kw):
 
@@ -119,7 +128,7 @@ def action(*args, **kwargs):
 
     # @action(long='to', type='int')
     # def move_to (self, options):
-    #     driver.moveTo(options.to)
+    #     inst.moveTo(options.to)
 
     See L{Action} for information about valid keywork arguments.
     """
@@ -158,12 +167,12 @@ def parameter(*args, **kwargs):
     else:
         return mark_param
 
-class InstrumentDriverCheckers:
+class CLICheckers:
 
     @staticmethod
     def check_includepath (option, opt_str, value, parser):
         if not value or not os.path.isdir (os.path.abspath(value)):
-            raise optparse.OptionValueError ("Couldn't found %s include path." % value)
+            raise optparse.OptionValueError ("Couldn't find %s include path." % value)
         l = getattr(parser.values, "%s" % option.dest)
         l.append(value)
 
@@ -240,7 +249,7 @@ class ChimeraCLI (object):
 
     @action(short='s', long='slew'):
     def slew(self, options):
-        driver.slew(options.ra, options.dec)
+        inst.slew(options.ra, options.dec)
 
     To define parameters, use parameter decorator or addParameter method.
     The parameter method passed to the decorator will be called to validate
@@ -275,7 +284,7 @@ class ChimeraCLI (object):
     def __init__ (self, prog, description, version,
                   host=None, port=None,
                   verbosity=True, sysconfig=True,
-                  driver_path=True, instrument_path=True, controllers_path=True):
+                  instrument_path=True, controllers_path=True):
 
         self.parser = optparse.OptionParser(prog=prog,
                                              description=_chimera_description_ + " - " + description,
@@ -306,12 +315,12 @@ class ChimeraCLI (object):
 
         if sysconfig:
             self.addHelpGroup("SYSCONFIG", "System Configuration")
-            self.addHelpGroup("LOCALMANAGER", "Chimera Client Host/Port")
+            self.addHelpGroup("LOCALMANAGER", "Client Host/Port")
 
-            self.addParameters(dict(name="sysconfig", type=str, default=SYSTEM_CONFIG_DEFAULT_FILENAME,
+            self.addParameters(dict(name="sysconfig", long="config", type=str, default=SYSTEM_CONFIG_DEFAULT_FILENAME,
                                     helpGroup="SYSCONFIG", help="Where to look for system congiguration."),
-                               dict(name="nosysconfig", long="no-sysconfig", default=False,
-                                    helpGroup="SYSCONFIG", help="Do not look for the system configuration file."),
+                               dict(name="skipglobal", long="skip-global", type=ParameterType.BOOLEAN, default=False,
+                                    helpGroup="SYSCONFIG", help="Do not look for the global system configuration file."),
                                dict(name="host", short="H", helpGroup="LOCALMANAGER", default=host or 'localhost',
                                     help="Host name/IP to bind the local Chimera instance."),
                                dict(name="port", short="P", helpGroup="LOCALMANAGER", default=port or 9000,
@@ -321,7 +330,6 @@ class ChimeraCLI (object):
         self.localManager = None
         self.sysconfig    = None
 
-        self._needDriversPath = driver_path
         self._needInstrumentsPath = instrument_path
         self._needControllersPath = controllers_path
 
@@ -382,22 +390,6 @@ class ChimeraCLI (object):
             self._needInstrumentsPath = False
             
 
-    def addDriver (self, **params):
-        params["type"] = ParameterType.DRIVER
-        self.addParameters(params)
- 
-        if self._needDriversPath:
-            if not "PATHS" in self._helpGroups:
-                self.addHelpGroup("PATHS", "Object Paths")
-            
-            self.addParameters(dict(name="drv_dir", short="D", long="drivers-dir", helpGroup="PATHS",
-                                    type=ParameterType.INCLUDE_PATH, default=[ChimeraPath.drivers()],
-                                    help="Append PATH to %s drivers load path. "
-                                    "This option could be setted multiple "
-                                    "times to add multiple directories." % params["name"].capitalize(),
-                                    metavar="PATH"))
-            self._needDriversPath = False
-
     def addController (self, **params):
         params["type"] = ParameterType.CONTROLLER
         self.addParameters(params)
@@ -431,8 +423,8 @@ class ChimeraCLI (object):
         # for each defined parameter, run validation code
         self._validateParameters(self.options)
 
-        # start local manager, getting information from sysconfig
-        self._startSystem(self.options)
+        # read sysconfig
+        self._readSysconfig(self.options)
 
         # setup objects
         self._setupObjects(self.options)
@@ -446,139 +438,98 @@ class ChimeraCLI (object):
 
         self.__stop__(self.options)
 
-    def _startSystem (self, options):
+    def _readSysconfig (self, options):
+        self.sysconfig = SystemConfig.fromFile(options.sysconfig, not options.skipglobal)
 
-        sysconfig = None
-
-        if not options.nosysconfig:
-            sysconfig = SystemConfig.fromFile(options.sysconfig)
+    def _startSystem (self, options, needSysconfigManager=True):
 
         localManager = Manager(getattr(options, 'host', 'localhost'),
                                getattr(options, 'port', 9000))
 
-        # check if the Manager specified on sysconfig is up, if not, start it
-        if sysconfig:
+        # if we need the Manager specified on sysconfig, check if it is up, if not, start it
+        if self.sysconfig and needSysconfigManager:
             try:
-                remoteManager = localManager.getProxy("%s:%d/Manager/0" % (sysconfig.chimera["host"],
-                                                                           sysconfig.chimera["port"]))
+                remoteManager = localManager.getProxy("%s:%d/Manager/0" % (self.sysconfig.chimera["host"],
+                                                                           self.sysconfig.chimera["port"]))
                 remoteManager.ping()
             except ObjectNotFoundException:
                 localManager.shutdown()
 
                 # FIXME: better way to start Chimera
-                args = "-f %s" % options.sysconfig
+                args = "--config %s" % options.sysconfig
+                if options.skipglobal:
+                    args += " --skip-global"
+
                 site = SiteController(args.split(), wait=False)
                 site.startup()
 
                 localManager = site.manager
 
-        self.sysconfig = sysconfig
         self.localManager = localManager
+
+    def _belongsTo(self, meHost, mePort, location):
+        
+        if not location: return False
+
+        meName = socket.gethostbyname(meHost)
+        return (location.host == None or location.host in (meHost, meName)) and \
+               (location.port == None or location.port == mePort)
 
     def _setupObjects (self, options):
 
-        # CLI requested objects (Action objects)
-        drivers     = dict([(x.name, x) for x in self._parameters.values() if x.type == ParameterType.DRIVER])
+        # CLI requested objects
         instruments = dict([(x.name, x) for x in self._parameters.values() if x.type == ParameterType.INSTRUMENT])
         controllers = dict([(x.name, x) for x in self._parameters.values() if x.type == ParameterType.CONTROLLER])
-        
-        # process inst/driver pairs
-        for inst in instruments.values():
 
-            new_local_driver = False
+        # create locations
+        for inst in instruments.values() + controllers.values():
+            
+            # use user instrument if given
+            if inst.default != getattr(options, inst.name):
+                try:
+                    inst.location = Location(getattr(options, inst.name))
+                except InvalidLocationException:
+                    self.exit("Invalid location: %s. See --help for more information" % getattr(options, inst.name))
 
-            inst_loc = None
-            drv_loc = None
+            else:
+                # no instrument selected, ask sysconfig for the first available
+                if self.sysconfig:
+                    locs = [i for i in self.sysconfig.instruments+self.sysconfig.controllers if i.cls.lower() == inst.cls.lower()]
+                    if locs:
+                        inst.location = locs[0]
+
+            if not inst.location and inst.required:
+                self.exit("Couldn't find %s configuration. "
+                          "Edit chimera.config or see --help for more information" % inst.name.capitalize())
+
+        # we only need to autostart the Manager instance configured on sysconfig
+        # if we are not using a remote intrument (in this case, the local manager started
+        # by the CLI to handle events can handle everthing.
+        needSysconfigManager = False
+
+        if self.sysconfig:
+            for inst in instruments.values()+controllers.values():
+                if self._belongsTo(self.sysconfig.chimera["host"],
+                                   self.sysconfig.chimera["port"], inst.location) == True:
+                    needSysconfigManager = True
+
+        # starts a local Manager (not using sysconfig) or a full sysconfig backed if needed.
+        self._startSystem(self.options, needSysconfigManager)
+
+        for inst in instruments.values() + controllers.values():
 
             inst_proxy = None
-            drv_proxy = None
 
-            drv = [d for d in drivers.values() if d.instrument == inst.name]
-            assert len(drv) > 0, "Parser error. Instrument without a driver!"
+            try:
+                inst_proxy = self.localManager.getProxy(inst.location)
+            except ObjectNotFoundException:
+                if inst.required == True:
+                    self.exit("Couldn't find %s, edit %s or "
+                              "pass the right instrument parameter (see --help)" % (inst.name.capitalize(),
+                                                                                    options.sysconfig))
 
-            # uses only the first driver (if more found)
-            if len(drv) >= 1:
-                drv = drv[0]
-                 
-            if inst.default != getattr(options, inst.name):
-                inst_loc = Location(getattr(options, inst.name))
-
-            if drv.default != getattr(options, drv.name):
-                drv_loc = Location(getattr(options, drv.name))
-
-            if not inst_loc:
-                if self.sysconfig:
-                    # FIXME: lower names
-                    inst_loc = [i for i in self.sysconfig.instruments if i.cls.lower() == inst.cls.lower()]
-                    if inst_loc: inst_loc = inst_loc[0]
-                else:
-                    self.exit("Couldn't found %s configuration."
-                              "Edit chimera.config or see --help for more information" % inst.name.capitalize())
-
-            if drv_loc:
-
-                try:
-                    drv_proxy = self.localManager.getProxy(drv_loc)
-                except ObjectNotFoundException:
-                    pass
-
-                if not drv_proxy:
-                    if self.localManager._belongsToMe(drv_loc):
-                        drv_proxy = self.localManager.addLocation(drv_loc, start=True,
-                                                                  path=ChimeraPath.drivers())
-                        new_local_driver = True
-                    else:
-                        self.exit("Couldn't found driver %s." % drv_loc)
-
-            if inst_loc:
-
-                try:
-                    inst_proxy = self.localManager.getProxy(inst_loc)
-                except ObjectNotFoundException:
-                    pass
-
-                if inst_proxy:
-
-                    if drv_proxy:
-
-                        if not inst_proxy["driver"] == drv_proxy.getLocation():
-                            if not new_local_driver:
-                                self.exit("Couldn't change %s driver to %s. "
-                                          "The %s is already running." % (inst_loc, drv_loc,
-                                                                            inst.name.capitalize()))
-                            else:
-                                # force local instrument
-                                inst_loc = Location(name=inst.cls, name="local_instrument")
-                                inst_loc._config.update({"driver": str(drv_loc)})
-                                inst_proxy = self.localManager.addLocation(inst_loc,
-                                                                           start=True,
-                                                                           path=ChimeraPath.instruments())
-                else:
-
-                    if self.localManager._belongsToMe(inst_loc):
-                        inst_loc._config.update({"driver": str(drv_loc)})
-                        inst_proxy = self.localManager.addLocation(inst_loc, start=True,
-                                                                   path=ChimeraPath.instruments())
-                    else:
-                        self.exit("Couldn't found %s (%s)." % (inst.name.capitalize(), inst_loc))
-
-
-            #print inst.name, inst.cls
-            #print "inst location:", inst_loc, "drv location:", drv_loc
-            #print "inst proxy   :", inst_proxy, "drv proxy:", drv_proxy
-            #print
-
-            if not inst_proxy and not drv_proxy and inst.required == True:
-                self.exit("Couldn't found %s configuration, Edit %s or "
-                          "pass instrument/driver parameters (see --help)" % (inst.name.capitalize(),
-                                                                              options.sysconfig))
-
-            # save values in options
-            if inst_proxy:
-                setattr(options, inst.name, inst_proxy)
-
-            if drv_proxy:
-                setattr(options, drv.name, drv_proxy)
+            # save values in CLI object (which users are supposed to inherites from).
+            setattr(self, inst.name, inst_proxy)                
 
     def __start__ (self, options, args):
         pass
@@ -637,21 +588,27 @@ class ChimeraCLI (object):
             option_action = "store"
             option_callback = None
             option_choices = None
+            option_const = None
             option_type = param.type or None
 
-            if param.type in (ParameterType.INSTRUMENT, ParameterType.DRIVER, ParameterType.CONTROLLER):
+            if param.type in (ParameterType.INSTRUMENT, ParameterType.CONTROLLER):
                 option_type = "string"
                 option_action = "callback"
-                option_callback  = InstrumentDriverCheckers.check_location
+                option_callback  = CLICheckers.check_location
 
             if param.type == ParameterType.BOOLEAN:
                 option_action = "store_true"
                 option_type = None
 
+            if param.type == ParameterType.CONSTANT:
+                option_action = "store_const"
+                option_type = None
+                option_const = param.const
+
             if param.type == ParameterType.INCLUDE_PATH:
                 option_action = "callback"
                 option_type = "string"
-                option_callback = InstrumentDriverCheckers.check_includepath
+                option_callback = CLICheckers.check_includepath
                 
             if param.type == ParameterType.CHOICE:
                 option_action = "store"
@@ -662,7 +619,6 @@ class ChimeraCLI (object):
                                  dest=param.name,
                                  help=param.help, metavar=param.metavar)
 
-
             if option_callback:
                 option_kwargs["callback"] = option_callback
 
@@ -671,6 +627,9 @@ class ChimeraCLI (object):
                 
             if option_choices:
                 option_kwargs["choices"] = option_choices
+
+            if option_const:
+                option_kwargs["const"] = option_const
 
             if param.short:
                 group.add_option(param.short, param.long, **option_kwargs)
@@ -719,9 +678,7 @@ class ChimeraCLI (object):
 
     def _validateParameters(self, options):
 
-        # for each defined parameter (!= default)
-        paramValues =  [ getattr(options, param) for param in self._parameters.keys()
-                        if getattr(options,param) != self._parameters[param].default ]
+        paramValues =  [ getattr(options, param) for param in self._parameters.keys() ]
 
         for name, value in zip(self._parameters.keys(), paramValues):
             param = self._parameters[name]
@@ -743,7 +700,7 @@ class ChimeraCLI (object):
                 method(options)
         except Exception, e:
             self.err("Something wrong with '%s' action." % (action.name))
-            sys.excepthook(*sys.exc_info())
+            printException(e)
             return False
 
         return True

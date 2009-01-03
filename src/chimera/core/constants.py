@@ -19,11 +19,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-import socket
-import os.path
 import sys
+import os
 
-#MANAGER_DEFAULT_HOST = socket.gethostname()
 MANAGER_DEFAULT_HOST = 'localhost'
 MANAGER_DEFAULT_PORT = 7666
 
